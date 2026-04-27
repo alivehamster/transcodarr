@@ -1,0 +1,7 @@
+app/
+config/
+
+Dockerfile-dev
+
+handbrake.txt
+stuff.txt
