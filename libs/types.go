@@ -14,8 +14,19 @@ type Library struct {
 }
 
 type Config struct {
-	Dirs    []string `json:"dirs"`
-	Profile string   `json:"profile"`
+	Dirs              []string `json:"dirs"`
+	HandbrakeCategory string   `json:"handbrakeCategory"`
+	HandbrakeProfile  string   `json:"handbrakeProfile"`
+}
+
+type Skip struct {
+	Path        string `json:"path"`
+	Description string `json:"description"`
+}
+
+type SkipList struct {
+	ID    int    `json:"id"`
+	Skips []Skip `json:"skips"`
 }
 
 type JobScheduler struct {

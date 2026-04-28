@@ -7,7 +7,8 @@ interface Library {
   cron?: string
   config?: {
     dirs?: string[]
-    profile?: string
+    handbrakeCategory?: string
+    handbrakeProfile?: string
   }
 }
 
@@ -29,6 +30,19 @@ const dirs = ref<string[]>([''])
 const selectedCategory = ref('')
 const profile = ref('')
 
+const errors = ref({
+  name: false,
+  cron: false,
+  dirs: false,
+})
+
+function validate() {
+  errors.value.name = name.value.trim() === ''
+  errors.value.cron = cron.value.trim() === ''
+  errors.value.dirs = dirs.value.every(d => d.trim() === '')
+  return !errors.value.name && !errors.value.cron && !errors.value.dirs
+}
+
 const availableProfiles = computed(() =>
   selectedCategory.value ? (profilesByCategory.value[selectedCategory.value] ?? []) : [],
 )
@@ -48,14 +62,25 @@ function removeDir(index: number) {
 }
 
 async function handleSave() {
+  if (!validate()) return
+
   const payload: Library = {
+    id: props.id,
+    name: name.value,
+    cron: cron.value,
+    config: {
+      dirs: dirs.value.filter(d => d.trim() !== ''),
+      handbrakeCategory: selectedCategory.value,
+      handbrakeProfile: profile.value,
+    },
   }
 
   const url = props.id !== undefined ? '/api/editLibrary' : '/api/createLibrary'
+  const method = props.id !== undefined ? 'PUT' : 'POST'
 
   try {
     await fetch(url, {
-      method: 'POST',
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
@@ -66,6 +91,22 @@ async function handleSave() {
 }
 
 onMounted(() => {
+
+  if(props.id !== undefined) {
+    fetch(`/api/library/${props.id}`)
+      .then(response => response.json())
+      .then((data: Library) => {
+        name.value = data.name ?? ''
+        cron.value = data.cron ?? ''
+        dirs.value = data.config?.dirs ?? ['']
+        selectedCategory.value = data.config?.handbrakeCategory ?? ''
+        profile.value = data.config?.handbrakeProfile ?? ''
+      })
+      .catch(error => {
+        console.error('Error fetching library details:', error)
+      })
+  }
+
   fetch('/api/handbrakeProfiles')
     .then(response => response.json())
     .then((data: Record<string, string[]>) => {
@@ -89,14 +130,18 @@ onMounted(() => {
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Name</label>
           <input v-model="name" type="text" placeholder="My Library"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+            class="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none"
+            :class="errors.name ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'" />
+          <p v-if="errors.name" class="mt-1 text-xs text-red-500">Name is required.</p>
         </div>
 
         <!-- Cron -->
         <div>
           <label class="mb-1 block text-sm font-medium text-gray-700">Cron Schedule</label>
           <input v-model="cron" type="text" placeholder="0 2 * * *"
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none" />
+            class="w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none"
+            :class="errors.cron ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'" />
+          <p v-if="errors.cron" class="mt-1 text-xs text-red-500">Cron schedule is required.</p>
         </div>
 
         <!-- Directories -->
@@ -113,6 +158,7 @@ onMounted(() => {
               </button>
             </div>
           </div>
+          <p v-if="errors.dirs" class="mt-1 text-xs text-red-500">At least one directory is required.</p>
           <button type="button" class="mt-2 text-sm text-blue-600 hover:underline cursor-pointer" @click="addDir">
             + Add directory
           </button>

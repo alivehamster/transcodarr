@@ -2,6 +2,8 @@ package libs
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
 
 	"github.com/robfig/cron/v3"
 )
@@ -68,11 +70,72 @@ func (js *JobScheduler) DeleteJob(libID int) {
 }
 
 func job(db *sql.DB, id int) {
-	var name string
-	err := db.QueryRow("SELECT name FROM libraries WHERE id = ?", id).Scan(&name)
+	var lib Library
+	var skiplist []Skip
+	var skiplistJSON sql.NullString
+	var configJSON string
+
+	row := db.QueryRow("SELECT id, name, cron, config, skiplist FROM libraries WHERE id = ?", id)
+	err := row.Scan(&lib.ID, &lib.Name, &lib.Cron, &configJSON, &skiplistJSON)
 	if err != nil {
 		println("Failed to get library:", err.Error())
 		return
 	}
-	println(name)
+
+	println("Running job for library:", lib.Name)
+
+	if err := json.Unmarshal([]byte(configJSON), &lib.Config); err != nil {
+		println("Failed to parse library config:", err.Error())
+		return
+	}
+
+	if skiplistJSON.Valid && skiplistJSON.String != "" {
+		if err := json.Unmarshal([]byte(skiplistJSON.String), &skiplist); err != nil {
+			println("Failed to parse library skiplist:", err.Error())
+			return
+		}
+	}
+
+	skipMap := make(map[string]struct{}, len(skiplist))
+	for _, s := range skiplist {
+		skipMap[s.Path] = struct{}{}
+	}
+
+	files := getlibItems(lib)
+	for _, path := range files {
+		if _, shouldSkip := skipMap[path]; shouldSkip {
+			println("Skipping:", path)
+			continue
+		}
+
+		// filter last modified date
+
+		codec, err := getCodec(path)
+		if err != nil {
+			println("Failed to get codec for", path, ":", err.Error())
+			continue
+		}
+		if codec == "av1" {
+			println("Skipping AV1 file:", path)
+
+			skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: fmt.Sprintf("Codec is already %s", codec)})
+			if err != nil {
+				println("Failed to update skiplist:", err.Error())
+			}
+			continue
+		}
+		println("Processing:", path)
+
+		// after transcoding compare new to initial file size
+
+		skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: "successfully transcoded"})
+		if err != nil {
+			println("Failed to update skiplist:", err.Error())
+		}
+	}
+
+}
+
+func RunJob(db *sql.DB, id int) {
+	job(db, id)
 }
