@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"os"
 	"path/filepath"
 	"strconv"
 
@@ -20,6 +21,10 @@ func main() {
 	dir, err := filepath.Abs("./config")
 	if err != nil {
 		log.Fatal("Failed to resolve current directory:", err)
+	}
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		log.Fatal("Failed to create config directory:", err)
 	}
 
 	db, err := sql.Open("sqlite3", filepath.Join(dir, "database.db"))
