@@ -79,3 +79,20 @@ func loadCustomProfiles(path string, result ProfilesByCategory) {
 		}
 	}
 }
+
+func transcode(config Config, path string, outputPath string) error {
+
+	args := []string{"-i", path, "-o", outputPath}
+
+	if config.HandbrakeCategory == "Custom" {
+		args = append(args, "--preset-import-file", "config/custom-presets.json", "-Z", config.HandbrakeProfile)
+	} else {
+		args = append(args, "-Z", config.HandbrakeProfile)
+	}
+
+	cmd := exec.Command("HandBrakeCLI", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}

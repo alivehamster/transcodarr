@@ -35,7 +35,7 @@ func getlibItems(lib Library) []string {
 				return nil
 			}
 			ext := strings.ToLower(filepath.Ext(path))
-			if _, ok := videoExtensions[ext]; ok {
+			if _, ok := videoExtensions[ext]; ok && !strings.Contains(filepath.Base(path), ".tmp.") {
 				paths = append(paths, path)
 			}
 			return nil
@@ -83,4 +83,16 @@ func updateSkiplist(db *sql.DB, id int, skiplist []Skip, entry Skip) ([]Skip, er
 		return skiplist, err
 	}
 	return skiplist, nil
+}
+
+func SaveHistory(db *sql.DB, text string) {
+	if _, err := db.Exec("INSERT INTO history (text) VALUES (?)", text); err != nil {
+		println("Failed to save history:", err.Error())
+	}
+}
+
+func SaveHistoryBatch(db *sql.DB, history []string) {
+	for _, entry := range history {
+		SaveHistory(db, entry)
+	}
 }

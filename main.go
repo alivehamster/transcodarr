@@ -42,6 +42,10 @@ func main() {
 			cron TEXT,
 			config TEXT,
 			skiplist TEXT
+		);
+		CREATE TABLE IF NOT EXISTS history (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			text TEXT
 		);`
 
 	_, err = db.Exec(createTableSQL)

@@ -4,6 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
 
 	"github.com/robfig/cron/v3"
 )
@@ -74,6 +79,8 @@ func job(db *sql.DB, id int) {
 	var skiplist []Skip
 	var skiplistJSON sql.NullString
 	var configJSON string
+	var history []string
+	defer func() { SaveHistoryBatch(db, history) }()
 
 	row := db.QueryRow("SELECT id, name, cron, config, skiplist FROM libraries WHERE id = ?", id)
 	err := row.Scan(&lib.ID, &lib.Name, &lib.Cron, &configJSON, &skiplistJSON)
@@ -104,11 +111,36 @@ func job(db *sql.DB, id int) {
 	files := getlibItems(lib)
 	for _, path := range files {
 		if _, shouldSkip := skipMap[path]; shouldSkip {
-			println("Skipping:", path)
+			msg := fmt.Sprintf("Skipping: %s", path)
+			println(msg)
+			history = append(history, msg)
 			continue
 		}
 
-		// filter last modified date
+		info, err := os.Stat(path)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			continue
+		}
+		// Cast the Sys() interface to the platform-specific Stat_t type
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			fmt.Println("Not a Unix-like system; cannot check hardlinks and ctime")
+			continue
+		}
+
+		if stat.Nlink > 1 {
+			msg := fmt.Sprintf("Skipping file with multiple hardlinks: %s", path)
+			println(msg)
+			history = append(history, msg)
+			continue
+		}
+		if time.Since(info.ModTime()) < (30 * 24 * time.Hour) {
+			msg := fmt.Sprintf("Skipping recently changed file: %s", path)
+			println(msg)
+			history = append(history, msg)
+			continue
+		}
 
 		codec, err := getCodec(path)
 		if err != nil {
@@ -116,7 +148,9 @@ func job(db *sql.DB, id int) {
 			continue
 		}
 		if codec == "av1" {
-			println("Skipping AV1 file:", path)
+			msg := fmt.Sprintf("Skipping AV1 file: %s", path)
+			println(msg)
+			history = append(history, msg)
 
 			skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: fmt.Sprintf("Codec is already %s", codec)})
 			if err != nil {
@@ -124,9 +158,51 @@ func job(db *sql.DB, id int) {
 			}
 			continue
 		}
-		println("Processing:", path)
+		msg := fmt.Sprintf("Processing: %s", path)
+		println(msg)
+		history = append(history, msg)
 
 		// after transcoding compare new to initial file size
+		filename := filepath.Base(path)
+		dir := filepath.Dir(path)
+		ext := filepath.Ext(filename)
+		nameWithoutExt := strings.TrimSuffix(filename, ext)
+		outputPath := filepath.Join(dir, nameWithoutExt+".tmp"+ext)
+
+		if err := transcode(lib.Config, path, outputPath); err != nil {
+			msg = fmt.Sprintf("Failed to transcode: %s", err.Error())
+			println(msg)
+			history = append(history, msg)
+			os.Remove(outputPath)
+			continue
+		}
+
+		outputInfo, err := os.Stat(outputPath)
+		if err != nil {
+			println("Failed to get output file info:", err.Error())
+			continue
+		}
+		if outputInfo.Size() >= info.Size() {
+			msg = fmt.Sprintf("Transcoded file is not smaller, skipping replacement: %s", path)
+			println(msg)
+			history = append(history, msg)
+			os.Remove(outputPath)
+			skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: "transcoded file not smaller"})
+			if err != nil {
+				println("Failed to update skiplist:", err.Error())
+			}
+			continue
+		}
+
+		if err := os.Remove(path); err != nil {
+			println("Failed to remove original file:", err.Error())
+			continue
+		}
+
+		if err := os.Rename(outputPath, path); err != nil {
+			println("Failed to rename transcoded file:", err.Error())
+			continue
+		}
 
 		skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: "successfully transcoded"})
 		if err != nil {
