@@ -254,7 +254,7 @@ func main() {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
 		}
 
-		libs.RunJob(db, id)
+		go libs.RunJob(db, js, id)
 
 		return c.JSON(fiber.Map{"message": "Job triggered"})
 	})

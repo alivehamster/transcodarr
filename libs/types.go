@@ -33,4 +33,5 @@ type JobScheduler struct {
 	scheduler *cron.Cron
 	jobMap    map[int]cron.EntryID
 	mu        sync.Mutex
+	jobMu     sync.Mutex
 }

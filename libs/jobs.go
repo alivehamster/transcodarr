@@ -33,7 +33,7 @@ func (js *JobScheduler) StartJobs(db *sql.DB) error {
 			return err
 		}
 		id, _ := js.scheduler.AddFunc(lib.Cron, func() {
-			job(db, lib.ID)
+			js.runJob(db, lib.ID)
 		})
 		js.jobMap[lib.ID] = id
 	}
@@ -54,7 +54,7 @@ func (js *JobScheduler) EditSchedule(db *sql.DB, lib Library) error {
 	}
 
 	id, err := js.scheduler.AddFunc(lib.Cron, func() {
-		job(db, lib.ID)
+		js.runJob(db, lib.ID)
 	})
 	if err != nil {
 		return err
@@ -72,6 +72,12 @@ func (js *JobScheduler) DeleteJob(libID int) {
 		js.scheduler.Remove(entryID)
 		delete(js.jobMap, libID)
 	}
+}
+
+func (js *JobScheduler) runJob(db *sql.DB, id int) {
+	js.jobMu.Lock()
+	defer js.jobMu.Unlock()
+	job(db, id)
 }
 
 func job(db *sql.DB, id int) {
@@ -212,6 +218,6 @@ func job(db *sql.DB, id int) {
 
 }
 
-func RunJob(db *sql.DB, id int) {
-	job(db, id)
+func RunJob(db *sql.DB, js *JobScheduler, id int) {
+	js.runJob(db, id)
 }
