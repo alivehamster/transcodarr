@@ -9,6 +9,10 @@ interface Library {
     dirs?: string[]
     handbrakeCategory?: string
     handbrakeProfile?: string
+    fileAge?: number
+    hardlinks?: boolean
+    mediaCodec?: string[] | null
+    filesize?: boolean
   }
 }
 
@@ -29,6 +33,27 @@ const cron = ref('')
 const dirs = ref<string[]>([''])
 const selectedCategory = ref('')
 const profile = ref('')
+
+const fileAgeEnabled = ref(false)
+const fileAgeDays = ref(0)
+const hardlinks = ref(false)
+const filesize = ref(false)
+
+const mediaCodecEnabled = ref(false)
+const mediaCodecs = ref<string[]>([])
+const selectedCodec = ref('h264')
+
+const availableCodecs = ['h264', 'h265', 'av1', 'vp9', 'vp8', 'mpeg4', 'mpeg2', 'theora', 'wmv3', 'prores']
+
+function addCodec() {
+  if (selectedCodec.value && !mediaCodecs.value.includes(selectedCodec.value)) {
+    mediaCodecs.value.push(selectedCodec.value)
+  }
+}
+
+function removeCodec(codec: string) {
+  mediaCodecs.value = mediaCodecs.value.filter(c => c !== codec)
+}
 
 const errors = ref({
   name: false,
@@ -72,6 +97,10 @@ async function handleSave() {
       dirs: dirs.value.filter(d => d.trim() !== ''),
       handbrakeCategory: selectedCategory.value,
       handbrakeProfile: profile.value,
+      fileAge: fileAgeEnabled.value ? fileAgeDays.value : 0,
+      hardlinks: hardlinks.value,
+      mediaCodec: mediaCodecEnabled.value ? mediaCodecs.value : null,
+      filesize: filesize.value,
     },
   }
 
@@ -101,6 +130,12 @@ onMounted(() => {
         dirs.value = data.config?.dirs ?? ['']
         selectedCategory.value = data.config?.handbrakeCategory ?? ''
         profile.value = data.config?.handbrakeProfile ?? ''
+        fileAgeEnabled.value = (data.config?.fileAge ?? 0) > 0
+        fileAgeDays.value = data.config?.fileAge ?? 0
+        hardlinks.value = data.config?.hardlinks ?? false
+        filesize.value = data.config?.filesize ?? false
+        mediaCodecEnabled.value = data.config?.mediaCodec != null
+        mediaCodecs.value = data.config?.mediaCodec ?? []
       })
       .catch(error => {
         console.error('Error fetching library details:', error)
@@ -120,7 +155,7 @@ onMounted(() => {
 
 <template>
   <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl overflow-y-auto max-h-[90vh]">
       <h2 class="mb-5 text-xl font-semibold">
         {{ props.id === undefined ? 'Add Library' : 'Edit Library' }}
       </h2>
@@ -181,6 +216,77 @@ onMounted(() => {
             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none cursor-pointer">
             <option v-for="p in availableProfiles" :key="p" :value="p">{{ p }}</option>
           </select>
+        </div>
+
+        <!-- File Age -->
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <input id="fileAge" v-model="fileAgeEnabled" type="checkbox" class="h-4 w-4 cursor-pointer" />
+            <label for="fileAge" class="text-sm font-medium text-gray-700 cursor-pointer">File Age Filter</label>
+            <span class="relative group flex items-center">
+              <span class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none">?</span>
+              <span class="absolute left-6 top-1/2 -translate-y-1/2 z-10 hidden group-hover:block w-56 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg">Skip if not older than listed date</span>
+            </span>
+          </div>
+          <div v-if="fileAgeEnabled" class="pl-6">
+            <div class="flex items-center gap-2">
+              <input v-model.number="fileAgeDays" type="number" min="1" placeholder="Days"
+                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+              <span class="text-sm text-gray-500">days</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hardlinks -->
+        <div class="flex items-center gap-2">
+          <input id="hardlinks" v-model="hardlinks" type="checkbox" class="h-4 w-4 cursor-pointer" />
+          <label for="hardlinks" class="text-sm font-medium text-gray-700 cursor-pointer">Hardlinks Filter</label>
+          <span class="relative group flex items-center">
+            <span class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none">?</span>
+            <span class="absolute left-6 top-1/2 -translate-y-1/2 z-10 hidden group-hover:block w-48 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg">Skip if hardlinks exist</span>
+          </span>
+        </div>
+
+        <!-- Filesize -->
+        <div class="flex items-center gap-2">
+          <input id="filesize" v-model="filesize" type="checkbox" class="h-4 w-4 cursor-pointer" />
+          <label for="filesize" class="text-sm font-medium text-gray-700 cursor-pointer">Filesize Filter</label>
+          <span class="relative group flex items-center">
+            <span class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none">?</span>
+            <span class="absolute left-6 top-1/2 -translate-y-1/2 z-10 hidden group-hover:block w-64 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg">Skip if transcoded file is not smaller than original</span>
+          </span>
+        </div>
+
+        <!-- Media Codec -->
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <input id="mediaCodec" v-model="mediaCodecEnabled" type="checkbox" class="h-4 w-4 cursor-pointer" />
+            <label for="mediaCodec" class="text-sm font-medium text-gray-700 cursor-pointer">Media Codec Filter</label>
+            <span class="relative group flex items-center">
+              <span class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none">?</span>
+              <span class="absolute left-6 top-1/2 -translate-y-1/2 z-10 hidden group-hover:block w-52 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg">Skip if already in listed codec</span>
+            </span>
+          </div>
+          <div v-if="mediaCodecEnabled" class="space-y-2 pl-6">
+            <div class="flex gap-2">
+              <select v-model="selectedCodec"
+                class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none cursor-pointer">
+                <option v-for="codec in availableCodecs" :key="codec" :value="codec">{{ codec }}</option>
+              </select>
+              <button type="button"
+                class="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+                @click="addCodec">
+                + Add
+              </button>
+            </div>
+            <div v-if="mediaCodecs.length > 0" class="flex flex-wrap gap-1">
+              <span v-for="codec in mediaCodecs" :key="codec"
+                class="flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-700">
+                {{ codec }}
+                <button type="button" class="hover:text-blue-900 cursor-pointer" @click="removeCodec(codec)">✕</button>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 

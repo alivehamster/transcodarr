@@ -17,6 +17,10 @@ type Config struct {
 	Dirs              []string `json:"dirs"`
 	HandbrakeCategory string   `json:"handbrakeCategory"`
 	HandbrakeProfile  string   `json:"handbrakeProfile"`
+	FileAge           int      `json:"fileAge"`
+	Hardlinks         bool     `json:"hardlinks"`
+	MediaCodec        []string `json:"mediaCodec"`
+	Filesize          bool     `json:"filesize"`
 }
 
 type Skip struct {

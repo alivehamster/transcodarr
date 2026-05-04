@@ -1,5 +1,5 @@
 # Transcodarr
-Automanically transcode media in a library such as jellyfin using handbrake
+Automanically transcode media in a folder using handbrake
 
 ## Filters
 - Skiplist
@@ -9,7 +9,7 @@ Automanically transcode media in a library such as jellyfin using handbrake
 - Transcoded media filesize compared to original
 
 ## Todo
-- Manually enable/disable and configure filters
+- Switch skiplist from json in db to its own table with foreign key to a library
 - Webpage for history
 - Add or remove handbrake configs 
 - Manually trigger scan

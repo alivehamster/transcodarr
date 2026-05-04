@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -85,26 +87,23 @@ func job(db *sql.DB, id int) {
 	var skiplist []Skip
 	var skiplistJSON sql.NullString
 	var configJSON string
-	var history []string
-	defer func() { SaveHistoryBatch(db, history) }()
-
 	row := db.QueryRow("SELECT id, name, cron, config, skiplist FROM libraries WHERE id = ?", id)
 	err := row.Scan(&lib.ID, &lib.Name, &lib.Cron, &configJSON, &skiplistJSON)
 	if err != nil {
-		println("Failed to get library:", err.Error())
+		log.Printf("Failed to get library: %s", err.Error())
 		return
 	}
 
-	println("Running job for library:", lib.Name)
+	log.Printf("Running job for library: %s", lib.Name)
 
 	if err := json.Unmarshal([]byte(configJSON), &lib.Config); err != nil {
-		println("Failed to parse library config:", err.Error())
+		log.Printf("Failed to parse library config: %s", err.Error())
 		return
 	}
 
 	if skiplistJSON.Valid && skiplistJSON.String != "" {
 		if err := json.Unmarshal([]byte(skiplistJSON.String), &skiplist); err != nil {
-			println("Failed to parse library skiplist:", err.Error())
+			log.Printf("Failed to parse library skiplist: %s", err.Error())
 			return
 		}
 	}
@@ -117,56 +116,54 @@ func job(db *sql.DB, id int) {
 	files := getlibItems(lib)
 	for _, path := range files {
 		if _, shouldSkip := skipMap[path]; shouldSkip {
-			msg := fmt.Sprintf("Skipping: %s", path)
-			println(msg)
-			history = append(history, msg)
+			SaveHistory(db, logMsg(fmt.Sprintf("Skipping: %s", path)))
 			continue
 		}
 
 		info, err := os.Stat(path)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			log.Printf("Error: %v", err)
 			continue
 		}
-		// Cast the Sys() interface to the platform-specific Stat_t type
-		stat, ok := info.Sys().(*syscall.Stat_t)
-		if !ok {
-			fmt.Println("Not a Unix-like system; cannot check hardlinks and ctime")
-			continue
-		}
-
-		if stat.Nlink > 1 {
-			msg := fmt.Sprintf("Skipping file with multiple hardlinks: %s", path)
-			println(msg)
-			history = append(history, msg)
-			continue
-		}
-		if time.Since(info.ModTime()) < (30 * 24 * time.Hour) {
-			msg := fmt.Sprintf("Skipping recently changed file: %s", path)
-			println(msg)
-			history = append(history, msg)
-			continue
-		}
-
-		codec, err := getCodec(path)
-		if err != nil {
-			println("Failed to get codec for", path, ":", err.Error())
-			continue
-		}
-		if codec == "av1" {
-			msg := fmt.Sprintf("Skipping AV1 file: %s", path)
-			println(msg)
-			history = append(history, msg)
-
-			skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: fmt.Sprintf("Codec is already %s", codec)})
-			if err != nil {
-				println("Failed to update skiplist:", err.Error())
+		if lib.Config.Hardlinks {
+			// Cast the Sys() interface to the platform-specific Stat_t type
+			stat, ok := info.Sys().(*syscall.Stat_t)
+			if !ok {
+				log.Println("Not a Unix-like system; cannot check hardlinks and ctime")
+				continue
 			}
-			continue
+
+			if stat.Nlink > 1 {
+				SaveHistory(db, logMsg(fmt.Sprintf("Skipping file with multiple hardlinks: %s", path)))
+				continue
+			}
 		}
-		msg := fmt.Sprintf("Processing: %s", path)
-		println(msg)
-		history = append(history, msg)
+
+		if lib.Config.FileAge != 0 {
+			if time.Since(info.ModTime()) < (time.Duration(lib.Config.FileAge) * 24 * time.Hour) {
+				SaveHistory(db, logMsg(fmt.Sprintf("Skipping recently changed file: %s", path)))
+				continue
+			}
+		}
+
+		if len(lib.Config.MediaCodec) > 0 {
+			codec, err := getCodec(path)
+			if err != nil {
+				log.Printf("Failed to get codec for %s: %s", path, err.Error())
+				continue
+			}
+			if slices.Contains(lib.Config.MediaCodec, codec) {
+				SaveHistory(db, logMsg(fmt.Sprintf("Skipping file with codec %s: %s", codec, path)))
+
+				skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: fmt.Sprintf("Codec is already %s", codec)})
+				if err != nil {
+					log.Printf("Failed to update skiplist: %s", err.Error())
+				}
+				continue
+			}
+		}
+
+		SaveHistory(db, logMsg(fmt.Sprintf("Processing: %s", path)))
 
 		// after transcoding compare new to initial file size
 		filename := filepath.Base(path)
@@ -176,43 +173,41 @@ func job(db *sql.DB, id int) {
 		outputPath := filepath.Join(dir, nameWithoutExt+".tmp"+ext)
 
 		if err := transcode(lib.Config, path, outputPath); err != nil {
-			msg = fmt.Sprintf("Failed to transcode: %s", err.Error())
-			println(msg)
-			history = append(history, msg)
+			SaveHistory(db, logMsg(fmt.Sprintf("Failed to transcode: %s", err.Error())))
 			os.Remove(outputPath)
 			continue
 		}
 
-		outputInfo, err := os.Stat(outputPath)
-		if err != nil {
-			println("Failed to get output file info:", err.Error())
-			continue
-		}
-		if outputInfo.Size() >= info.Size() {
-			msg = fmt.Sprintf("Transcoded file is not smaller, skipping replacement: %s", path)
-			println(msg)
-			history = append(history, msg)
-			os.Remove(outputPath)
-			skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: "transcoded file not smaller"})
+		if lib.Config.Filesize {
+			outputInfo, err := os.Stat(outputPath)
 			if err != nil {
-				println("Failed to update skiplist:", err.Error())
+				log.Printf("Failed to get output file info: %s", err.Error())
+				continue
 			}
-			continue
+			if outputInfo.Size() >= info.Size() {
+				SaveHistory(db, logMsg(fmt.Sprintf("Transcoded file is not smaller, skipping replacement: %s", path)))
+				os.Remove(outputPath)
+				skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: "transcoded file not smaller"})
+				if err != nil {
+					log.Printf("Failed to update skiplist: %s", err.Error())
+				}
+				continue
+			}
 		}
 
 		if err := os.Remove(path); err != nil {
-			println("Failed to remove original file:", err.Error())
+			log.Printf("Failed to remove original file: %s", err.Error())
 			continue
 		}
 
 		if err := os.Rename(outputPath, path); err != nil {
-			println("Failed to rename transcoded file:", err.Error())
+			log.Printf("Failed to rename transcoded file: %s", err.Error())
 			continue
 		}
 
 		skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: "successfully transcoded"})
 		if err != nil {
-			println("Failed to update skiplist:", err.Error())
+			log.Printf("Failed to update skiplist: %s", err.Error())
 		}
 	}
 

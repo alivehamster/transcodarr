@@ -3,10 +3,13 @@ package libs
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io/fs"
+	"log"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var videoExtensions = map[string]struct{}{
@@ -70,16 +73,21 @@ func getCodec(path string) (string, error) {
 	return result.Streams[0].CodecName, nil
 }
 
+func logMsg(msg string) string {
+	log.Println(msg)
+	return fmt.Sprintf("%s %s", time.Now().Format(time.DateTime), msg)
+}
+
 func updateSkiplist(db *sql.DB, id int, skiplist []Skip, entry Skip) ([]Skip, error) {
 	skiplist = append(skiplist, entry)
 
 	updated, err := json.Marshal(skiplist)
 	if err != nil {
-		println("Failed to serialize skiplist:", err.Error())
+		log.Printf("Failed to serialize skiplist: %s", err.Error())
 		return skiplist, err
 	}
 	if _, err := db.Exec("UPDATE libraries SET skiplist = ? WHERE id = ?", string(updated), id); err != nil {
-		println("Failed to update skiplist:", err.Error())
+		log.Printf("Failed to update skiplist: %s", err.Error())
 		return skiplist, err
 	}
 	return skiplist, nil
@@ -87,12 +95,6 @@ func updateSkiplist(db *sql.DB, id int, skiplist []Skip, entry Skip) ([]Skip, er
 
 func SaveHistory(db *sql.DB, text string) {
 	if _, err := db.Exec("INSERT INTO history (text) VALUES (?)", text); err != nil {
-		println("Failed to save history:", err.Error())
-	}
-}
-
-func SaveHistoryBatch(db *sql.DB, history []string) {
-	for _, entry := range history {
-		SaveHistory(db, entry)
+		log.Printf("Failed to save history: %s", err.Error())
 	}
 }
