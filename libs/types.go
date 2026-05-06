@@ -24,13 +24,9 @@ type Config struct {
 }
 
 type Skip struct {
+	ID          int    `json:"id"`
 	Path        string `json:"path"`
 	Description string `json:"description"`
-}
-
-type SkipList struct {
-	ID    int    `json:"id"`
-	Skips []Skip `json:"skips"`
 }
 
 type JobScheduler struct {

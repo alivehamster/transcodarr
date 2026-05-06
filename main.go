@@ -40,17 +40,28 @@ func main() {
 
 	log.Println("Database connected successfully")
 
+	_, err = db.Exec("PRAGMA foreign_keys = ON")
+	if err != nil {
+		log.Fatal("Failed to enable foreign keys:", err)
+	}
+
 	createTableSQL := `
 		CREATE TABLE IF NOT EXISTS libraries (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT,
 			cron TEXT,
-			config TEXT,
-			skiplist TEXT
+			config TEXT
 		);
 		CREATE TABLE IF NOT EXISTS history (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			text TEXT
+		);
+		CREATE TABLE IF NOT EXISTS skiplist (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			library_id INTEGER NOT NULL,
+			path TEXT,
+			description TEXT,
+			FOREIGN KEY (library_id) REFERENCES libraries(id)
 		);`
 
 	_, err = db.Exec(createTableSQL)
@@ -131,21 +142,21 @@ func main() {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
 		}
 
-		row := db.QueryRow("SELECT skiplist FROM libraries WHERE id = ?", id)
-		var skiplistJSON sql.NullString
+		rows, err := db.Query("SELECT id, path, description FROM skiplist WHERE library_id = ?", id)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch skiplist"})
+		}
+		defer rows.Close()
+
 		var skiplist []libs.Skip
-		if err := row.Scan(&skiplistJSON); err != nil {
-			if err == sql.ErrNoRows {
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Library not found"})
+		for rows.Next() {
+			var skip libs.Skip
+			if err := rows.Scan(&skip.ID, &skip.Path, &skip.Description); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse skiplist data"})
 			}
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch library"})
+			skiplist = append(skiplist, skip)
 		}
 
-		if skiplistJSON.Valid && skiplistJSON.String != "" {
-			if err := json.Unmarshal([]byte(skiplistJSON.String), &skiplist); err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse library skiplist"})
-			}
-		}
 		if skiplist == nil {
 			skiplist = []libs.Skip{}
 		}
@@ -153,28 +164,26 @@ func main() {
 		return c.JSON(skiplist)
 	})
 
-	app.Put("/api/editSkiplist", func(c fiber.Ctx) error {
-		var skiplist libs.SkipList
-		if err := c.Bind().JSON(&skiplist); err != nil {
-			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
-		}
-
-		skiplistJSON, err := json.Marshal(skiplist.Skips)
+	app.Get("/api/history", func(c fiber.Ctx) error {
+		rows, err := db.Query("SELECT text FROM history ORDER BY id DESC")
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to serialize skiplist"})
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch history"})
+		}
+		defer rows.Close()
+
+		var history []string
+		for rows.Next() {
+			var text string
+			if err := rows.Scan(&text); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse history data"})
+			}
+			history = append(history, text)
+		}
+		if err := rows.Err(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error iterating history data"})
 		}
 
-		result, err := db.Exec("UPDATE libraries SET skiplist = ? WHERE id = ?", string(skiplistJSON), skiplist.ID)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update library"})
-		}
-
-		rows, _ := result.RowsAffected()
-		if rows == 0 {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Library not found"})
-		}
-
-		return c.JSON(skiplist)
+		return c.JSON(history)
 	})
 
 	app.Post("/api/createLibrary", func(c fiber.Ctx) error {
@@ -247,6 +256,22 @@ func main() {
 		}
 
 		js.DeleteJob(id)
+
+		return c.SendStatus(fiber.StatusOK)
+	})
+
+	app.Delete("/api/removeSkip/:id", func(c fiber.Ctx) error {
+		idstr := c.Params("id")
+
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid skip ID"})
+		}
+
+		_, err = db.Exec("DELETE FROM skiplist WHERE id = ?", id)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete skip"})
+		}
 
 		return c.SendStatus(fiber.StatusOK)
 	})

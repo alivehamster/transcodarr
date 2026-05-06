@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import Tooltip from './Tooltip.vue'
 
 interface Library {
   id?: number
@@ -223,10 +224,7 @@ onMounted(() => {
           <div class="flex items-center gap-2 mb-2">
             <input id="fileAge" v-model="fileAgeEnabled" type="checkbox" class="h-4 w-4 cursor-pointer" />
             <label for="fileAge" class="text-sm font-medium text-gray-700 cursor-pointer">File Age Filter</label>
-            <span class="relative group flex items-center">
-              <span class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none">?</span>
-              <span class="absolute left-6 top-1/2 -translate-y-1/2 z-10 hidden group-hover:block w-56 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg">Skip if not older than listed date</span>
-            </span>
+            <Tooltip text="Skip if not older than listed date" />
           </div>
           <div v-if="fileAgeEnabled" class="pl-6">
             <div class="flex items-center gap-2">
@@ -241,20 +239,14 @@ onMounted(() => {
         <div class="flex items-center gap-2">
           <input id="hardlinks" v-model="hardlinks" type="checkbox" class="h-4 w-4 cursor-pointer" />
           <label for="hardlinks" class="text-sm font-medium text-gray-700 cursor-pointer">Hardlinks Filter</label>
-          <span class="relative group flex items-center">
-            <span class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none">?</span>
-            <span class="absolute left-6 top-1/2 -translate-y-1/2 z-10 hidden group-hover:block w-48 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg">Skip if hardlinks exist</span>
-          </span>
+          <Tooltip text="Skip if hardlinks exist" />
         </div>
 
         <!-- Filesize -->
         <div class="flex items-center gap-2">
           <input id="filesize" v-model="filesize" type="checkbox" class="h-4 w-4 cursor-pointer" />
           <label for="filesize" class="text-sm font-medium text-gray-700 cursor-pointer">Filesize Filter</label>
-          <span class="relative group flex items-center">
-            <span class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none">?</span>
-            <span class="absolute left-6 top-1/2 -translate-y-1/2 z-10 hidden group-hover:block w-64 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg">Skip if transcoded file is not smaller than original</span>
-          </span>
+          <Tooltip text="Skip if transcoded file is not smaller than original" />
         </div>
 
         <!-- Media Codec -->
@@ -262,10 +254,7 @@ onMounted(() => {
           <div class="flex items-center gap-2 mb-2">
             <input id="mediaCodec" v-model="mediaCodecEnabled" type="checkbox" class="h-4 w-4 cursor-pointer" />
             <label for="mediaCodec" class="text-sm font-medium text-gray-700 cursor-pointer">Media Codec Filter</label>
-            <span class="relative group flex items-center">
-              <span class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none">?</span>
-              <span class="absolute left-6 top-1/2 -translate-y-1/2 z-10 hidden group-hover:block w-52 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg">Skip if already in listed codec</span>
-            </span>
+            <Tooltip text="Skip if already in listed codec" />
           </div>
           <div v-if="mediaCodecEnabled" class="space-y-2 pl-6">
             <div class="flex gap-2">

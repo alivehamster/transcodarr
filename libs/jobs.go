@@ -84,11 +84,9 @@ func (js *JobScheduler) runJob(db *sql.DB, id int) {
 
 func job(db *sql.DB, id int) {
 	var lib Library
-	var skiplist []Skip
-	var skiplistJSON sql.NullString
 	var configJSON string
-	row := db.QueryRow("SELECT id, name, cron, config, skiplist FROM libraries WHERE id = ?", id)
-	err := row.Scan(&lib.ID, &lib.Name, &lib.Cron, &configJSON, &skiplistJSON)
+	row := db.QueryRow("SELECT id, name, cron, config FROM libraries WHERE id = ?", id)
+	err := row.Scan(&lib.ID, &lib.Name, &lib.Cron, &configJSON)
 	if err != nil {
 		log.Printf("Failed to get library: %s", err.Error())
 		return
@@ -101,16 +99,10 @@ func job(db *sql.DB, id int) {
 		return
 	}
 
-	if skiplistJSON.Valid && skiplistJSON.String != "" {
-		if err := json.Unmarshal([]byte(skiplistJSON.String), &skiplist); err != nil {
-			log.Printf("Failed to parse library skiplist: %s", err.Error())
-			return
-		}
-	}
-
-	skipMap := make(map[string]struct{}, len(skiplist))
-	for _, s := range skiplist {
-		skipMap[s.Path] = struct{}{}
+	skipMap, err := getSkipMap(db, id)
+	if err != nil {
+		log.Printf("Failed to get skiplist: %s", err.Error())
+		return
 	}
 
 	files := getlibItems(lib)
@@ -155,9 +147,9 @@ func job(db *sql.DB, id int) {
 			if slices.Contains(lib.Config.MediaCodec, codec) {
 				SaveHistory(db, logMsg(fmt.Sprintf("Skipping file with codec %s: %s", codec, path)))
 
-				skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: fmt.Sprintf("Codec is already %s", codec)})
+				err = addSkip(db, id, path, fmt.Sprintf("Codec is already %s", codec))
 				if err != nil {
-					log.Printf("Failed to update skiplist: %s", err.Error())
+					log.Printf("Failed to add to skiplist: %s", err.Error())
 				}
 				continue
 			}
@@ -187,9 +179,9 @@ func job(db *sql.DB, id int) {
 			if outputInfo.Size() >= info.Size() {
 				SaveHistory(db, logMsg(fmt.Sprintf("Transcoded file is not smaller, skipping replacement: %s", path)))
 				os.Remove(outputPath)
-				skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: "transcoded file not smaller"})
+				err = addSkip(db, id, path, "transcoded file not smaller")
 				if err != nil {
-					log.Printf("Failed to update skiplist: %s", err.Error())
+					log.Printf("Failed to add to skiplist: %s", err.Error())
 				}
 				continue
 			}
@@ -205,9 +197,9 @@ func job(db *sql.DB, id int) {
 			continue
 		}
 
-		skiplist, err = updateSkiplist(db, id, skiplist, Skip{Path: path, Description: "successfully transcoded"})
+		err = addSkip(db, id, path, "successfully transcoded")
 		if err != nil {
-			log.Printf("Failed to update skiplist: %s", err.Error())
+			log.Printf("Failed to add to skiplist: %s", err.Error())
 		}
 	}
 

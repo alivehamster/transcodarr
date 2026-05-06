@@ -78,23 +78,32 @@ func logMsg(msg string) string {
 	return fmt.Sprintf("%s %s", time.Now().Format(time.DateTime), msg)
 }
 
-func updateSkiplist(db *sql.DB, id int, skiplist []Skip, entry Skip) ([]Skip, error) {
-	skiplist = append(skiplist, entry)
-
-	updated, err := json.Marshal(skiplist)
-	if err != nil {
-		log.Printf("Failed to serialize skiplist: %s", err.Error())
-		return skiplist, err
-	}
-	if _, err := db.Exec("UPDATE libraries SET skiplist = ? WHERE id = ?", string(updated), id); err != nil {
-		log.Printf("Failed to update skiplist: %s", err.Error())
-		return skiplist, err
-	}
-	return skiplist, nil
-}
-
 func SaveHistory(db *sql.DB, text string) {
 	if _, err := db.Exec("INSERT INTO history (text) VALUES (?)", text); err != nil {
 		log.Printf("Failed to save history: %s", err.Error())
 	}
+}
+
+func addSkip(db *sql.DB, libID int, path, description string) error {
+	_, err := db.Exec("INSERT INTO skiplist (library_id, path, description) VALUES (?, ?, ?)", libID, path, description)
+	return err
+}
+
+func getSkipMap(db *sql.DB, libraryID int) (map[string]struct{}, error) {
+	rows, err := db.Query("SELECT path FROM skiplist WHERE library_id = ?", libraryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	skipMap := make(map[string]struct{})
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			log.Printf("Failed to scan skiplist: %s", err.Error())
+			continue
+		}
+		skipMap[path] = struct{}{}
+	}
+	return skipMap, nil
 }

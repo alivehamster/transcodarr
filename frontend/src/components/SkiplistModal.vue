@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 
 interface Skip {
+  id: number
   path: string
   description: string
 }
@@ -29,15 +30,13 @@ onMounted(async () => {
   }
 })
 
-async function removeItem(index: number) {
-  skiplist.value.splice(index, 1)
+async function removeItem(id: number) {
   saving.value = true
   try {
-    await fetch('/api/editSkiplist', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: props.id, skips: skiplist.value }),
+    await fetch(`/api/removeSkip/${id}`, {
+      method: 'DELETE',
     })
+    skiplist.value = skiplist.value.filter(item => item.id !== id)
   } catch (error) {
     console.error('Error saving skiplist:', error)
   } finally {
@@ -68,8 +67,8 @@ async function removeItem(index: number) {
 
       <ul v-else class="space-y-2 max-h-96 overflow-y-auto">
         <li
-          v-for="(item, i) in skiplist"
-          :key="i"
+          v-for="item in skiplist"
+          :key="item.id"
           class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm"
         >
           <div class="min-w-0 flex-1 overflow-x-auto">
@@ -80,7 +79,7 @@ async function removeItem(index: number) {
             type="button"
             :disabled="saving"
             class="ml-3 shrink-0 rounded-lg border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-50"
-            @click="removeItem(i)"
+            @click="removeItem(item.id)"
           >
             ✕
           </button>
