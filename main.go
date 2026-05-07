@@ -289,7 +289,10 @@ func main() {
 		return c.JSON(fiber.Map{"message": "Job triggered"})
 	})
 
-	app.Get("*", static.New("./frontend/dist"))
+	app.Use(static.New("./frontend/dist"))
+	app.Get("*", func(c fiber.Ctx) error {
+		return c.SendFile("./frontend/dist/index.html")
+	})
 
 	log.Println("Server starting on", port)
 	log.Fatal(app.Listen(":" + port))
