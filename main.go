@@ -3,16 +3,35 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/alivehamster/transcodarr/libs"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+var videoExtensions = map[string]struct{}{
+	".mkv":  {},
+	".mp4":  {},
+	".m4v":  {},
+	".avi":  {},
+	".mov":  {},
+	".wmv":  {},
+	".mpg":  {},
+	".mpeg": {},
+	".ts":   {},
+	".m2ts": {},
+	".mts":  {},
+	".vob":  {},
+	".flv":  {},
+	".webm": {},
+}
 
 func main() {
 
@@ -199,15 +218,56 @@ func main() {
 			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 		}
 
-		result, err := db.Exec("INSERT INTO skiplist (library_id, path, description) VALUES (?, ?, ?)", id, skip.Path, skip.Description)
+		skip.Path = strings.TrimSpace(skip.Path)
+		if skip.Path == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Path is required"})
+		}
+
+		pathInfo, err := os.Stat(skip.Path)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Path does not exist"})
+		}
+
+		pathsToAdd := []string{}
+		if pathInfo.IsDir() {
+			err := filepath.WalkDir(skip.Path, func(path string, d fs.DirEntry, walkErr error) error {
+				if walkErr != nil || d.IsDir() {
+					return nil
+				}
+
+				ext := strings.ToLower(filepath.Ext(path))
+				if _, ok := videoExtensions[ext]; ok && !strings.Contains(filepath.Base(path), ".tmp.") {
+					pathsToAdd = append(pathsToAdd, path)
+				}
+
+				return nil
+			})
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to scan directory"})
+			}
+		} else {
+			pathsToAdd = append(pathsToAdd, skip.Path)
+		}
+
+		tx, err := db.Begin()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add skip"})
 		}
 
-		skipID, _ := result.LastInsertId()
-		skip.ID = int(skipID)
+		for _, path := range pathsToAdd {
+			_, err := tx.Exec("INSERT INTO skiplist (library_id, path, description) VALUES (?, ?, ?)", id, path, skip.Description)
+			if err != nil {
+				tx.Rollback()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add skip"})
+			}
+		}
 
-		return c.JSON(skip)
+		if err := tx.Commit(); err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add skip"})
+		}
+
+		return c.SendStatus(fiber.StatusOK)
 	})
 
 	app.Post("/api/createLibrary", func(c fiber.Ctx) error {

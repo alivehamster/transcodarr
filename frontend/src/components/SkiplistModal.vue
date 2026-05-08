@@ -23,12 +23,18 @@ const addPath = ref('')
 const addDescription = ref('')
 const addError = ref('')
 
-onMounted(async () => {
+async function loadSkiplist() {
   try {
     const response = await fetch(`/api/skiplist/${props.id}`)
     skiplist.value = await response.json()
   } catch (error) {
     console.error('Error fetching skiplist:', error)
+  }
+}
+
+onMounted(async () => {
+  try {
+    await loadSkiplist()
   } finally {
     loading.value = false
   }
@@ -74,8 +80,7 @@ async function addItem() {
       throw new Error(`Request failed with status ${response.status}`)
     }
 
-    const created: Skip = await response.json()
-    skiplist.value.push(created)
+    await loadSkiplist()
     addPath.value = ''
     addDescription.value = ''
   } catch (error) {
