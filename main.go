@@ -255,7 +255,7 @@ func main() {
 		}
 
 		for _, path := range pathsToAdd {
-			_, err := tx.Exec("INSERT INTO skiplist (library_id, path, description) VALUES (?, ?, ?)", id, path, skip.Description)
+			_, err := tx.Exec("INSERT INTO skiplist (library_id, path, description) VALUES (?, ?, ?)", id, path, "Manual")
 			if err != nil {
 				tx.Rollback()
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add skip"})
@@ -355,6 +355,28 @@ func main() {
 		_, err = db.Exec("DELETE FROM skiplist WHERE id = ?", id)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete skip"})
+		}
+
+		return c.SendStatus(fiber.StatusOK)
+	})
+
+	app.Delete("/api/clearAutoSkips/:id", func(c fiber.Ctx) error {
+		idstr := c.Params("id")
+
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
+		}
+
+		_, err = db.Exec(
+			"DELETE FROM skiplist WHERE library_id = ? AND COALESCE(description, '') NOT IN (?, ?, ?)",
+			id,
+			"Manual",
+			"Transcoded file is not smaller",
+			"Successfully transcoded",
+		)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to clear generated skiplist entries"})
 		}
 
 		return c.SendStatus(fiber.StatusOK)

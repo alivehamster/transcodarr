@@ -18,6 +18,7 @@ type Config struct {
 	HandbrakeCategory string   `json:"handbrakeCategory"`
 	HandbrakeProfile  string   `json:"handbrakeProfile"`
 	FileAge           int      `json:"fileAge"`
+	MinimumFileSizeMb int64    `json:"minimumFileSizeMb"`
 	Hardlinks         bool     `json:"hardlinks"`
 	MediaCodec        []string `json:"mediaCodec"`
 	Filesize          bool     `json:"filesize"`

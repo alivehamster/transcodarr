@@ -20,7 +20,6 @@ const loading = ref(true)
 const saving = ref(false)
 const adding = ref(false)
 const addPath = ref('')
-const addDescription = ref('')
 const addError = ref('')
 
 async function loadSkiplist() {
@@ -72,7 +71,6 @@ async function addItem() {
       },
       body: JSON.stringify({
         path,
-        description: addDescription.value.trim(),
       }),
     })
 
@@ -82,7 +80,6 @@ async function addItem() {
 
     await loadSkiplist()
     addPath.value = ''
-    addDescription.value = ''
   } catch (error) {
     console.error('Error adding skip item:', error)
     addError.value = 'Failed to add skip item.'
@@ -129,14 +126,6 @@ async function addItem() {
             {{ adding ? 'Adding...' : 'Add Skip' }}
           </button>
         </div>
-
-        <input
-          v-model="addDescription"
-          type="text"
-          placeholder="Description (optional)"
-          class="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
-        >
-
         <p v-if="addError" class="mt-2 text-xs text-red-600">{{ addError }}</p>
       </div>
 

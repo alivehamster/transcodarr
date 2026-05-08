@@ -11,6 +11,7 @@ interface Library {
     handbrakeCategory?: string
     handbrakeProfile?: string
     fileAge?: number
+    minimumFileSizeMb?: number
     hardlinks?: boolean
     mediaCodec?: string[] | null
     filesize?: boolean
@@ -37,12 +38,15 @@ const profile = ref('')
 
 const fileAgeEnabled = ref(false)
 const fileAgeDays = ref(0)
+const minimumFileSizeEnabled = ref(false)
+const minimumFileSizeMb = ref(0)
 const hardlinks = ref(false)
 const filesize = ref(false)
 
 const mediaCodecEnabled = ref(false)
 const mediaCodecs = ref<string[]>([])
 const selectedCodec = ref('h264')
+const initialFilterSignature = ref('')
 
 const availableCodecs = ['h264', 'h265', 'av1', 'vp9', 'vp8', 'mpeg4', 'mpeg2', 'theora', 'wmv3', 'prores']
 
@@ -73,6 +77,30 @@ const availableProfiles = computed(() =>
   selectedCategory.value ? (profilesByCategory.value[selectedCategory.value] ?? []) : [],
 )
 
+const currentFilterSignature = computed(() => {
+  const normalizedCodecs = mediaCodecEnabled.value
+    ? [...mediaCodecs.value].sort()
+    : []
+
+  return JSON.stringify({
+    fileAge: fileAgeEnabled.value ? fileAgeDays.value : 0,
+    minimumFileSizeMb: minimumFileSizeEnabled.value ? minimumFileSizeMb.value : 0,
+    hardlinks: hardlinks.value,
+    filesize: filesize.value,
+    mediaCodec: normalizedCodecs,
+  })
+})
+
+const hasFilterChangesInEditMode = computed(() => {
+  if (props.id === undefined) {
+    return false
+  }
+  if (!initialFilterSignature.value) {
+    return false
+  }
+  return currentFilterSignature.value !== initialFilterSignature.value
+})
+
 function onCategoryChange() {
   profile.value = availableProfiles.value[0] ?? ''
 }
@@ -99,6 +127,7 @@ async function handleSave() {
       handbrakeCategory: selectedCategory.value,
       handbrakeProfile: profile.value,
       fileAge: fileAgeEnabled.value ? fileAgeDays.value : 0,
+      minimumFileSizeMb: minimumFileSizeEnabled.value ? minimumFileSizeMb.value : 0,
       hardlinks: hardlinks.value,
       mediaCodec: mediaCodecEnabled.value ? mediaCodecs.value : null,
       filesize: filesize.value,
@@ -109,11 +138,26 @@ async function handleSave() {
   const method = props.id !== undefined ? 'PUT' : 'POST'
 
   try {
-    await fetch(url, {
+    const saveResponse = await fetch(url, {
       method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
+
+    if (!saveResponse.ok) {
+      throw new Error(`Failed to save library: ${saveResponse.status}`)
+    }
+
+    if (props.id !== undefined && hasFilterChangesInEditMode.value) {
+      const clearResponse = await fetch(`/api/clearAutoSkips/${props.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!clearResponse.ok) {
+        throw new Error(`Failed to clear auto skips: ${clearResponse.status}`)
+      }
+    }
+
     emit('saved')
   } catch (error) {
     console.error('Error saving library:', error)
@@ -133,10 +177,13 @@ onMounted(() => {
         profile.value = data.config?.handbrakeProfile ?? ''
         fileAgeEnabled.value = (data.config?.fileAge ?? 0) > 0
         fileAgeDays.value = data.config?.fileAge ?? 0
+        minimumFileSizeEnabled.value = (data.config?.minimumFileSizeMb ?? 0) > 0
+        minimumFileSizeMb.value = data.config?.minimumFileSizeMb ?? 0
         hardlinks.value = data.config?.hardlinks ?? false
         filesize.value = data.config?.filesize ?? false
         mediaCodecEnabled.value = data.config?.mediaCodec != null
         mediaCodecs.value = data.config?.mediaCodec ?? []
+        initialFilterSignature.value = currentFilterSignature.value
       })
       .catch(error => {
         console.error('Error fetching library details:', error)
@@ -235,6 +282,22 @@ onMounted(() => {
           </div>
         </div>
 
+        <!-- Minimum File Size -->
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <input id="minimumFileSize" v-model="minimumFileSizeEnabled" type="checkbox" class="h-4 w-4 cursor-pointer" />
+            <label for="minimumFileSize" class="text-sm font-medium text-gray-700 cursor-pointer">Minimum File Size Filter</label>
+            <Tooltip text="Skip any files smaller than this" />
+          </div>
+          <div v-if="minimumFileSizeEnabled" class="pl-6">
+            <div class="flex items-center gap-2">
+              <input v-model.number="minimumFileSizeMb" type="number" min="1" placeholder="MB"
+                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+              <span class="text-sm text-gray-500">MB</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Hardlinks -->
         <div class="flex items-center gap-2">
           <input id="hardlinks" v-model="hardlinks" type="checkbox" class="h-4 w-4 cursor-pointer" />
@@ -245,7 +308,7 @@ onMounted(() => {
         <!-- Filesize -->
         <div class="flex items-center gap-2">
           <input id="filesize" v-model="filesize" type="checkbox" class="h-4 w-4 cursor-pointer" />
-          <label for="filesize" class="text-sm font-medium text-gray-700 cursor-pointer">Filesize Filter</label>
+          <label for="filesize" class="text-sm font-medium text-gray-700 cursor-pointer">Transcode Not Smaller Filter</label>
           <Tooltip text="Skip if transcoded file is not smaller than original" />
         </div>
 
@@ -276,6 +339,13 @@ onMounted(() => {
               </span>
             </div>
           </div>
+        </div>
+
+        <div
+          v-if="hasFilterChangesInEditMode"
+          class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+        >
+          Warning: Changing filters will delete automatically added skiplist entries except entries marked Manual and filters that take place after transcoding.
         </div>
       </div>
 

@@ -117,6 +117,19 @@ func job(db *sql.DB, id int) {
 			log.Printf("Error: %v", err)
 			continue
 		}
+
+		if lib.Config.MinimumFileSizeMb > 0 {
+			minimumBytes := lib.Config.MinimumFileSizeMb * 1024 * 1024
+			if info.Size() < minimumBytes {
+				SaveHistory(db, logMsg(fmt.Sprintf("Skipping file smaller than minimum size (%d MB): %s", lib.Config.MinimumFileSizeMb, path)))
+				err = addSkip(db, id, path, fmt.Sprintf("File is smaller than minimum size (%d MB)", lib.Config.MinimumFileSizeMb))
+				if err != nil {
+					log.Printf("Failed to add to skiplist: %s", err.Error())
+				}
+				continue
+			}
+		}
+
 		if lib.Config.Hardlinks {
 			// Cast the Sys() interface to the platform-specific Stat_t type
 			stat, ok := info.Sys().(*syscall.Stat_t)
@@ -179,7 +192,7 @@ func job(db *sql.DB, id int) {
 			if outputInfo.Size() >= info.Size() {
 				SaveHistory(db, logMsg(fmt.Sprintf("Transcoded file is not smaller, skipping replacement: %s", path)))
 				os.Remove(outputPath)
-				err = addSkip(db, id, path, "transcoded file not smaller")
+				err = addSkip(db, id, path, "Transcoded file is not smaller")
 				if err != nil {
 					log.Printf("Failed to add to skiplist: %s", err.Error())
 				}
@@ -197,7 +210,7 @@ func job(db *sql.DB, id int) {
 			continue
 		}
 
-		err = addSkip(db, id, path, "successfully transcoded")
+		err = addSkip(db, id, path, "Successfully transcoded")
 		if err != nil {
 			log.Printf("Failed to add to skiplist: %s", err.Error())
 		}
