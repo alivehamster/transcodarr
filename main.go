@@ -186,6 +186,30 @@ func main() {
 		return c.JSON(history)
 	})
 
+	app.Post("/api/addSkip/:id", func(c fiber.Ctx) error {
+		idstr := c.Params("id")
+
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
+		}
+
+		var skip libs.Skip
+		if err := c.Bind().JSON(&skip); err != nil {
+			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+		}
+
+		result, err := db.Exec("INSERT INTO skiplist (library_id, path, description) VALUES (?, ?, ?)", id, skip.Path, skip.Description)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add skip"})
+		}
+
+		skipID, _ := result.LastInsertId()
+		skip.ID = int(skipID)
+
+		return c.JSON(skip)
+	})
+
 	app.Post("/api/createLibrary", func(c fiber.Ctx) error {
 		var lib libs.Library
 		if err := c.Bind().JSON(&lib); err != nil {

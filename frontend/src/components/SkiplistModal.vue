@@ -18,6 +18,10 @@ const emit = defineEmits<{
 const skiplist = ref<Skip[]>([])
 const loading = ref(true)
 const saving = ref(false)
+const adding = ref(false)
+const addPath = ref('')
+const addDescription = ref('')
+const addError = ref('')
 
 onMounted(async () => {
   try {
@@ -43,6 +47,44 @@ async function removeItem(id: number) {
     saving.value = false
   }
 }
+
+async function addItem() {
+  const path = addPath.value.trim()
+  if (!path) {
+    addError.value = 'Path is required.'
+    return
+  }
+
+  adding.value = true
+  addError.value = ''
+
+  try {
+    const response = await fetch(`/api/addSkip/${props.id}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        path,
+        description: addDescription.value.trim(),
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Request failed with status ${response.status}`)
+    }
+
+    const created: Skip = await response.json()
+    skiplist.value.push(created)
+    addPath.value = ''
+    addDescription.value = ''
+  } catch (error) {
+    console.error('Error adding skip item:', error)
+    addError.value = 'Failed to add skip item.'
+  } finally {
+    adding.value = false
+  }
+}
 </script>
 
 <template>
@@ -61,11 +103,39 @@ async function removeItem(id: number) {
 
       <div v-if="loading" class="text-sm text-gray-500">Loading...</div>
 
-      <div v-else-if="skiplist.length === 0" class="text-sm text-gray-500">
+      <div v-if="!loading && skiplist.length === 0" class="text-sm text-gray-500">
         No items in the skip list.
       </div>
 
-      <ul v-else class="space-y-2 max-h-96 overflow-y-auto">
+      <div class="mb-4 mt-4 rounded-lg border border-gray-200 p-3">
+        <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <input
+            v-model="addPath"
+            type="text"
+            placeholder="Path to skip"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+          >
+          <button
+            type="button"
+            :disabled="adding"
+            class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer disabled:opacity-50"
+            @click="addItem"
+          >
+            {{ adding ? 'Adding...' : 'Add Skip' }}
+          </button>
+        </div>
+
+        <input
+          v-model="addDescription"
+          type="text"
+          placeholder="Description (optional)"
+          class="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500"
+        >
+
+        <p v-if="addError" class="mt-2 text-xs text-red-600">{{ addError }}</p>
+      </div>
+
+      <ul v-if="!loading && skiplist.length > 0" class="space-y-2 max-h-96 overflow-y-auto">
         <li
           v-for="item in skiplist"
           :key="item.id"

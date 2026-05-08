@@ -13,5 +13,4 @@ Automanically transcode media in a folder using handbrake
 - Manually trigger scan
 - Time since last scan
 - Time till next scan
-- Manually add items to skiplist
 - Webhooks after scans
