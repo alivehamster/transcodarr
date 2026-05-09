@@ -10,6 +10,7 @@ interface Library {
     dirs?: string[]
     handbrakeCategory?: string
     handbrakeProfile?: string
+    cacheDir?: string
     fileAge?: number
     minimumFileSizeMb?: number
     hardlinks?: boolean
@@ -35,6 +36,7 @@ const cron = ref('')
 const dirs = ref<string[]>([''])
 const selectedCategory = ref('')
 const profile = ref('')
+const cacheDir = ref('')
 
 const fileAgeEnabled = ref(false)
 const fileAgeDays = ref(0)
@@ -126,6 +128,7 @@ async function handleSave() {
       dirs: dirs.value.filter(d => d.trim() !== ''),
       handbrakeCategory: selectedCategory.value,
       handbrakeProfile: profile.value,
+      cacheDir: cacheDir.value.trim(),
       fileAge: fileAgeEnabled.value ? fileAgeDays.value : 0,
       minimumFileSizeMb: minimumFileSizeEnabled.value ? minimumFileSizeMb.value : 0,
       hardlinks: hardlinks.value,
@@ -166,7 +169,7 @@ async function handleSave() {
 
 onMounted(() => {
 
-  if(props.id !== undefined) {
+  if (props.id !== undefined) {
     fetch(`/api/library/${props.id}`)
       .then(response => response.json())
       .then((data: Library) => {
@@ -175,6 +178,7 @@ onMounted(() => {
         dirs.value = data.config?.dirs ?? ['']
         selectedCategory.value = data.config?.handbrakeCategory ?? ''
         profile.value = data.config?.handbrakeProfile ?? ''
+        cacheDir.value = data.config?.cacheDir ?? ''
         fileAgeEnabled.value = (data.config?.fileAge ?? 0) > 0
         fileAgeDays.value = data.config?.fileAge ?? 0
         minimumFileSizeEnabled.value = (data.config?.minimumFileSizeMb ?? 0) > 0
@@ -229,7 +233,7 @@ onMounted(() => {
 
         <!-- Directories -->
         <div>
-          <label class="mb-1 block text-sm font-medium text-gray-700">Directories</label>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Source Directories</label>
           <div class="space-y-2">
             <div v-for="(_, i) in dirs" :key="i" class="flex gap-2">
               <input v-model="dirs[i]" type="text" placeholder="/path/to/media"
@@ -245,6 +249,14 @@ onMounted(() => {
           <button type="button" class="mt-2 text-sm text-blue-600 hover:underline cursor-pointer" @click="addDir">
             + Add directory
           </button>
+        </div>
+
+        <!-- Cache Directory -->
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700">Transcode Cache Directory</label>
+          <input v-model="cacheDir" type="text" placeholder="/path/to/cache"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+          <p class="mt-1 text-xs text-gray-500">Leave blank to keep temporary files next to the source video.</p>
         </div>
 
         <!-- HandBrake Category -->
@@ -285,8 +297,10 @@ onMounted(() => {
         <!-- Minimum File Size -->
         <div>
           <div class="flex items-center gap-2 mb-2">
-            <input id="minimumFileSize" v-model="minimumFileSizeEnabled" type="checkbox" class="h-4 w-4 cursor-pointer" />
-            <label for="minimumFileSize" class="text-sm font-medium text-gray-700 cursor-pointer">Minimum File Size Filter</label>
+            <input id="minimumFileSize" v-model="minimumFileSizeEnabled" type="checkbox"
+              class="h-4 w-4 cursor-pointer" />
+            <label for="minimumFileSize" class="text-sm font-medium text-gray-700 cursor-pointer">Minimum File Size
+              Filter</label>
             <Tooltip text="Skip any files smaller than this" />
           </div>
           <div v-if="minimumFileSizeEnabled" class="pl-6">
@@ -308,7 +322,8 @@ onMounted(() => {
         <!-- Filesize -->
         <div class="flex items-center gap-2">
           <input id="filesize" v-model="filesize" type="checkbox" class="h-4 w-4 cursor-pointer" />
-          <label for="filesize" class="text-sm font-medium text-gray-700 cursor-pointer">Transcode Not Smaller Filter</label>
+          <label for="filesize" class="text-sm font-medium text-gray-700 cursor-pointer">Transcode Not Smaller
+            Filter</label>
           <Tooltip text="Skip if transcoded file is not smaller than original" />
         </div>
 
@@ -341,21 +356,22 @@ onMounted(() => {
           </div>
         </div>
 
-        <div
-          v-if="hasFilterChangesInEditMode"
-          class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800"
-        >
-          Warning: Changing filters will delete automatically added skiplist entries except entries marked Manual and filters that take place after transcoding.
+        <div v-if="hasFilterChangesInEditMode"
+          class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Warning: Changing filters will delete automatically added skiplist entries except entries marked Manual and
+          filters that take place after transcoding.
         </div>
       </div>
 
       <!-- Actions -->
       <div class="mt-6 flex justify-end gap-3">
-        <button type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+        <button type="button"
+          class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer"
           @click="emit('cancel')">
           Cancel
         </button>
-        <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 cursor-pointer"
+        <button type="button"
+          class="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 cursor-pointer"
           @click="handleSave">
           Save
         </button>

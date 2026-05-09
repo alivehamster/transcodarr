@@ -175,7 +175,15 @@ func job(db *sql.DB, id int) {
 		dir := filepath.Dir(path)
 		ext := filepath.Ext(filename)
 		nameWithoutExt := strings.TrimSuffix(filename, ext)
-		outputPath := filepath.Join(dir, nameWithoutExt+".tmp"+ext)
+		outputDir := dir
+		if strings.TrimSpace(lib.Config.CacheDir) != "" {
+			outputDir = lib.Config.CacheDir
+			if err := os.MkdirAll(outputDir, 0755); err != nil {
+				log.Printf("Failed to create cache directory: %s", err.Error())
+				continue
+			}
+		}
+		outputPath := filepath.Join(outputDir, nameWithoutExt+".tmp"+ext)
 
 		if err := transcode(lib.Config, path, outputPath); err != nil {
 			SaveHistory(db, logMsg(fmt.Sprintf("Failed to transcode: %s", err.Error())))

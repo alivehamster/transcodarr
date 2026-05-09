@@ -17,6 +17,7 @@ type Config struct {
 	Dirs              []string `json:"dirs"`
 	HandbrakeCategory string   `json:"handbrakeCategory"`
 	HandbrakeProfile  string   `json:"handbrakeProfile"`
+	CacheDir          string   `json:"cacheDir"`
 	FileAge           int      `json:"fileAge"`
 	MinimumFileSizeMb int64    `json:"minimumFileSizeMb"`
 	Hardlinks         bool     `json:"hardlinks"`
