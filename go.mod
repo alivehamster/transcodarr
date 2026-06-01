@@ -1,6 +1,6 @@
 module github.com/alivehamster/transcodarr
 
-go 1.26.2
+go 1.26.3
 
 require (
 	github.com/gofiber/fiber/v3 v3.2.0

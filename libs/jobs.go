@@ -208,13 +208,8 @@ func job(db *sql.DB, id int) {
 			}
 		}
 
-		if err := os.Remove(path); err != nil {
-			log.Printf("Failed to remove original file: %s", err.Error())
-			continue
-		}
-
-		if err := os.Rename(outputPath, path); err != nil {
-			log.Printf("Failed to rename transcoded file: %s", err.Error())
+		if err := replaceFile(outputPath, path); err != nil {
+			log.Printf("Failed to replace original file: %s", err.Error())
 			continue
 		}
 
@@ -225,7 +220,6 @@ func job(db *sql.DB, id int) {
 	}
 
 }
-
 func RunJob(db *sql.DB, js *JobScheduler, id int) {
 	js.runJob(db, id)
 }

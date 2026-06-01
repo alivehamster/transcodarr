@@ -3,12 +3,16 @@ package libs
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -106,4 +110,65 @@ func getSkipMap(db *sql.DB, libraryID int) (map[string]struct{}, error) {
 		skipMap[path] = struct{}{}
 	}
 	return skipMap, nil
+}
+
+func replaceFile(src, dst string) error {
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	} else if !errors.Is(err, syscall.EXDEV) {
+		return err
+	}
+
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	tempFile, err := os.CreateTemp(filepath.Dir(dst), ".transcodarr-replace-*")
+	if err != nil {
+		return err
+	}
+	tempPath := tempFile.Name()
+
+	defer func() {
+		tempFile.Close()
+		os.Remove(tempPath)
+	}()
+
+	if _, err := io.Copy(tempFile, srcFile); err != nil {
+		return err
+	}
+
+	if err := tempFile.Sync(); err != nil {
+		return err
+	}
+
+	if err := tempFile.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Chmod(tempPath, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tempPath, dst); err != nil {
+		if removeErr := os.Remove(dst); removeErr != nil {
+			return err
+		}
+		if err := os.Rename(tempPath, dst); err != nil {
+			return err
+		}
+	}
+
+	if err := os.Remove(src); err != nil {
+		return err
+	}
+
+	return nil
 }
