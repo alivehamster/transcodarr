@@ -56,6 +56,16 @@ async function deleteLibrary(id: number) {
   }
 }
 
+async function startScan(id: number) {
+  try {
+    await fetch(`/api/run/${id}`, {
+      method: 'POST',
+    })
+  } catch (error) {
+    console.error('Error starting scan for library:', error)
+  }
+}
+
 function onSaved() {
   showModal.value = false
   fetchLibraries()
@@ -101,6 +111,12 @@ function onSaved() {
             @click="deleteLibrary(lib.id)"
           >
             Delete
+          </button>
+          <button
+            class="rounded-lg border border-green-300 px-3 py-1 text-sm text-green-600 hover:bg-green-50 cursor-pointer"
+            @click="startScan(lib.id)"
+          >
+            Run
           </button>
         </div>
       </div>

@@ -10,9 +10,10 @@ Automanically transcode media in a folder using handbrake
 - Transcoded media filesize compared to original
 
 ## Todo
-- Add or remove handbrake configs 
-- Manually trigger scan
+- Flow chart filters
 - Group skips by directory
+- Fix History page
+- Add or remove handbrake configs 
 - Time since last scan
 - Time till next scan
 - Webhooks after scans

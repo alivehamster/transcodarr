@@ -382,7 +382,7 @@ func main() {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	app.Get("/api/run/:id", func(c fiber.Ctx) error {
+	app.Post("/api/run/:id", func(c fiber.Ctx) error {
 		idstr := c.Params("id")
 
 		id, err := strconv.Atoi(idstr)
