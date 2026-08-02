@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alivehamster/transcodarr/libs"
+	"github.com/alivehamster/transcodarr/internal"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	_ "github.com/mattn/go-sqlite3"
@@ -88,7 +88,7 @@ func main() {
 		log.Fatal("Failed to create tables:", err)
 	}
 
-	js := libs.NewJobScheduler()
+	js := internal.NewJobScheduler()
 
 	err = js.StartJobs(db)
 	if err != nil {
@@ -98,7 +98,7 @@ func main() {
 	app := fiber.New()
 
 	app.Get("/api/libraries", func(c fiber.Ctx) error {
-		var libraries []libs.Library
+		var libraries []internal.Library
 
 		rows, err := db.Query("SELECT id, name, cron FROM libraries")
 		if err != nil {
@@ -107,7 +107,7 @@ func main() {
 		defer rows.Close()
 
 		for rows.Next() {
-			var lib libs.Library
+			var lib internal.Library
 			if err := rows.Scan(&lib.ID, &lib.Name, &lib.Cron); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse library data"})
 			}
@@ -129,7 +129,7 @@ func main() {
 		}
 
 		row := db.QueryRow("SELECT id, name, cron, config FROM libraries WHERE id = ?", id)
-		var lib libs.Library
+		var lib internal.Library
 		var configJSON string
 		if err := row.Scan(&lib.ID, &lib.Name, &lib.Cron, &configJSON); err != nil {
 			if err == sql.ErrNoRows {
@@ -146,7 +146,7 @@ func main() {
 	})
 
 	app.Get("/api/handbrakeProfiles", func(c fiber.Ctx) error {
-		profiles, err := libs.GetHandBrakeProfiles()
+		profiles, err := internal.GetHandBrakeProfiles()
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch HandBrake profiles"})
 		}
@@ -167,9 +167,9 @@ func main() {
 		}
 		defer rows.Close()
 
-		var skiplist []libs.Skip
+		var skiplist []internal.Skip
 		for rows.Next() {
-			var skip libs.Skip
+			var skip internal.Skip
 			if err := rows.Scan(&skip.ID, &skip.Path, &skip.Description); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse skiplist data"})
 			}
@@ -177,7 +177,7 @@ func main() {
 		}
 
 		if skiplist == nil {
-			skiplist = []libs.Skip{}
+			skiplist = []internal.Skip{}
 		}
 
 		return c.JSON(skiplist)
@@ -213,7 +213,7 @@ func main() {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
 		}
 
-		var skip libs.Skip
+		var skip internal.Skip
 		if err := c.Bind().JSON(&skip); err != nil {
 			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 		}
@@ -271,7 +271,7 @@ func main() {
 	})
 
 	app.Post("/api/createLibrary", func(c fiber.Ctx) error {
-		var lib libs.Library
+		var lib internal.Library
 		if err := c.Bind().JSON(&lib); err != nil {
 			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 		}
@@ -298,7 +298,7 @@ func main() {
 	})
 
 	app.Put("/api/editLibrary", func(c fiber.Ctx) error {
-		var lib libs.Library
+		var lib internal.Library
 		if err := c.Bind().JSON(&lib); err != nil {
 			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 		}
@@ -390,7 +390,7 @@ func main() {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
 		}
 
-		go libs.RunJob(db, js, id)
+		go internal.RunJob(db, js, id)
 
 		return c.JSON(fiber.Map{"message": "Job triggered"})
 	})

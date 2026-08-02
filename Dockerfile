@@ -2,9 +2,9 @@ FROM golang:1.26.3-trixie AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
-COPY main.go ./
-COPY libs/ ./libs/
-RUN CGO_ENABLED=1 go build -o server .
+
+COPY . .
+RUN CGO_ENABLED=1 go build -o ./server ./cmd/
 
 FROM node:24-trixie AS node-builder
 WORKDIR /app
