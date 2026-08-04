@@ -360,28 +360,6 @@ func main() {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	app.Delete("/api/clearAutoSkips/:id", func(c fiber.Ctx) error {
-		idstr := c.Params("id")
-
-		id, err := strconv.Atoi(idstr)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
-		}
-
-		_, err = db.Exec(
-			"DELETE FROM skiplist WHERE library_id = ? AND COALESCE(description, '') NOT IN (?, ?, ?)",
-			id,
-			"Manual",
-			"Transcoded file is not smaller",
-			"Successfully transcoded",
-		)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to clear generated skiplist entries"})
-		}
-
-		return c.SendStatus(fiber.StatusOK)
-	})
-
 	app.Post("/api/run/:id", func(c fiber.Ctx) error {
 		idstr := c.Params("id")
 

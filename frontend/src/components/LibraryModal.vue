@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import Tooltip from './Tooltip.vue'
+import FiltersModal from './filters/FiltersModal.vue'
+
+import type { OrderedFilter } from './filters/filters'
+
+type FlowSaveResult = {
+  nodes: any[]
+  edges: any[]
+  order: OrderedFilter[]
+}
 
 interface Library {
   id?: number
@@ -11,11 +20,9 @@ interface Library {
     handbrakeCategory?: string
     handbrakeProfile?: string
     cacheDir?: string
-    fileAge?: number
-    minimumFileSizeMb?: number
-    hardlinks?: boolean
-    mediaCodec?: string[] | null
-    filesize?: boolean
+    nodes?: any[]
+    edges?: any[]
+    order?: OrderedFilter[]
   }
 }
 
@@ -28,6 +35,9 @@ const emit = defineEmits<{
   saved: []
 }>()
 
+const showModal = ref(false)
+const flowFilters = ref<FlowSaveResult | null>(null)
+
 const profilesByCategory = ref<Record<string, string[]>>({})
 const categories = computed(() => Object.keys(profilesByCategory.value))
 
@@ -37,30 +47,6 @@ const dirs = ref<string[]>([''])
 const selectedCategory = ref('')
 const profile = ref('')
 const cacheDir = ref('')
-
-const fileAgeEnabled = ref(false)
-const fileAgeDays = ref(0)
-const minimumFileSizeEnabled = ref(false)
-const minimumFileSizeMb = ref(0)
-const hardlinks = ref(false)
-const filesize = ref(false)
-
-const mediaCodecEnabled = ref(false)
-const mediaCodecs = ref<string[]>([])
-const selectedCodec = ref('h264')
-const initialFilterSignature = ref('')
-
-const availableCodecs = ['h264', 'h265', 'av1', 'vp9', 'vp8', 'mpeg4', 'mpeg2', 'theora', 'wmv3', 'prores']
-
-function addCodec() {
-  if (selectedCodec.value && !mediaCodecs.value.includes(selectedCodec.value)) {
-    mediaCodecs.value.push(selectedCodec.value)
-  }
-}
-
-function removeCodec(codec: string) {
-  mediaCodecs.value = mediaCodecs.value.filter(c => c !== codec)
-}
 
 const errors = ref({
   name: false,
@@ -79,30 +65,6 @@ const availableProfiles = computed(() =>
   selectedCategory.value ? (profilesByCategory.value[selectedCategory.value] ?? []) : [],
 )
 
-const currentFilterSignature = computed(() => {
-  const normalizedCodecs = mediaCodecEnabled.value
-    ? [...mediaCodecs.value].sort()
-    : []
-
-  return JSON.stringify({
-    fileAge: fileAgeEnabled.value ? fileAgeDays.value : 0,
-    minimumFileSizeMb: minimumFileSizeEnabled.value ? minimumFileSizeMb.value : 0,
-    hardlinks: hardlinks.value,
-    filesize: filesize.value,
-    mediaCodec: normalizedCodecs,
-  })
-})
-
-const hasFilterChangesInEditMode = computed(() => {
-  if (props.id === undefined) {
-    return false
-  }
-  if (!initialFilterSignature.value) {
-    return false
-  }
-  return currentFilterSignature.value !== initialFilterSignature.value
-})
-
 function onCategoryChange() {
   profile.value = availableProfiles.value[0] ?? ''
 }
@@ -117,6 +79,11 @@ function removeDir(index: number) {
   }
 }
 
+function handleFiltersSave(payload: FlowSaveResult) {
+  flowFilters.value = payload
+  showModal.value = false
+}
+
 async function handleSave() {
   if (!validate()) return
 
@@ -129,11 +96,9 @@ async function handleSave() {
       handbrakeCategory: selectedCategory.value,
       handbrakeProfile: profile.value,
       cacheDir: cacheDir.value.trim(),
-      fileAge: fileAgeEnabled.value ? fileAgeDays.value : 0,
-      minimumFileSizeMb: minimumFileSizeEnabled.value ? minimumFileSizeMb.value : 0,
-      hardlinks: hardlinks.value,
-      mediaCodec: mediaCodecEnabled.value ? mediaCodecs.value : null,
-      filesize: filesize.value,
+      nodes: flowFilters.value?.nodes ?? [],
+      edges: flowFilters.value?.edges ?? [],
+      order: flowFilters.value?.order ?? [],
     },
   }
 
@@ -149,16 +114,6 @@ async function handleSave() {
 
     if (!saveResponse.ok) {
       throw new Error(`Failed to save library: ${saveResponse.status}`)
-    }
-
-    if (props.id !== undefined && hasFilterChangesInEditMode.value) {
-      const clearResponse = await fetch(`/api/clearAutoSkips/${props.id}`, {
-        method: 'DELETE',
-      })
-
-      if (!clearResponse.ok) {
-        throw new Error(`Failed to clear auto skips: ${clearResponse.status}`)
-      }
     }
 
     emit('saved')
@@ -179,15 +134,13 @@ onMounted(() => {
         selectedCategory.value = data.config?.handbrakeCategory ?? ''
         profile.value = data.config?.handbrakeProfile ?? ''
         cacheDir.value = data.config?.cacheDir ?? ''
-        fileAgeEnabled.value = (data.config?.fileAge ?? 0) > 0
-        fileAgeDays.value = data.config?.fileAge ?? 0
-        minimumFileSizeEnabled.value = (data.config?.minimumFileSizeMb ?? 0) > 0
-        minimumFileSizeMb.value = data.config?.minimumFileSizeMb ?? 0
-        hardlinks.value = data.config?.hardlinks ?? false
-        filesize.value = data.config?.filesize ?? false
-        mediaCodecEnabled.value = data.config?.mediaCodec != null
-        mediaCodecs.value = data.config?.mediaCodec ?? []
-        initialFilterSignature.value = currentFilterSignature.value
+        if(data.config?.nodes && data.config?.edges && data.config?.order) {
+          flowFilters.value = {
+            nodes: data.config?.nodes ?? [],
+            edges: data.config?.edges ?? [],
+            order: data.config?.order ?? [],
+          }
+        }
       })
       .catch(error => {
         console.error('Error fetching library details:', error)
@@ -278,90 +231,13 @@ onMounted(() => {
           </select>
         </div>
 
-        <!-- File Age -->
         <div>
-          <div class="flex items-center gap-2 mb-2">
-            <input id="fileAge" v-model="fileAgeEnabled" type="checkbox" class="h-4 w-4 cursor-pointer" />
-            <label for="fileAge" class="text-sm font-medium text-gray-700 cursor-pointer">File Age Filter</label>
-            <Tooltip text="Skip if not older than listed date" />
-          </div>
-          <div v-if="fileAgeEnabled" class="pl-6">
-            <div class="flex items-center gap-2">
-              <input v-model.number="fileAgeDays" type="number" min="1" placeholder="Days"
-                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-              <span class="text-sm text-gray-500">days</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Minimum File Size -->
-        <div>
-          <div class="flex items-center gap-2 mb-2">
-            <input id="minimumFileSize" v-model="minimumFileSizeEnabled" type="checkbox"
-              class="h-4 w-4 cursor-pointer" />
-            <label for="minimumFileSize" class="text-sm font-medium text-gray-700 cursor-pointer">Minimum File Size
-              Filter</label>
-            <Tooltip text="Skip any files smaller than this" />
-          </div>
-          <div v-if="minimumFileSizeEnabled" class="pl-6">
-            <div class="flex items-center gap-2">
-              <input v-model.number="minimumFileSizeMb" type="number" min="1" placeholder="MB"
-                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-              <span class="text-sm text-gray-500">MB</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Hardlinks -->
-        <div class="flex items-center gap-2">
-          <input id="hardlinks" v-model="hardlinks" type="checkbox" class="h-4 w-4 cursor-pointer" />
-          <label for="hardlinks" class="text-sm font-medium text-gray-700 cursor-pointer">Hardlinks Filter</label>
-          <Tooltip text="Skip if hardlinks exist" />
-        </div>
-
-        <!-- Filesize -->
-        <div class="flex items-center gap-2">
-          <input id="filesize" v-model="filesize" type="checkbox" class="h-4 w-4 cursor-pointer" />
-          <label for="filesize" class="text-sm font-medium text-gray-700 cursor-pointer">Transcode Not Smaller
-            Filter</label>
-          <Tooltip text="Skip if transcoded file is not smaller than original" />
-        </div>
-
-        <!-- Media Codec -->
-        <div>
-          <div class="flex items-center gap-2 mb-2">
-            <input id="mediaCodec" v-model="mediaCodecEnabled" type="checkbox" class="h-4 w-4 cursor-pointer" />
-            <label for="mediaCodec" class="text-sm font-medium text-gray-700 cursor-pointer">Media Codec Filter</label>
-            <Tooltip text="Skip if already in listed codec" />
-          </div>
-          <div v-if="mediaCodecEnabled" class="space-y-2 pl-6">
-            <div class="flex gap-2">
-              <select v-model="selectedCodec"
-                class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none cursor-pointer">
-                <option v-for="codec in availableCodecs" :key="codec" :value="codec">{{ codec }}</option>
-              </select>
-              <button type="button"
-                class="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
-                @click="addCodec">
-                + Add
-              </button>
-            </div>
-            <div v-if="mediaCodecs.length > 0" class="flex flex-wrap gap-1">
-              <span v-for="codec in mediaCodecs" :key="codec"
-                class="flex items-center gap-1 rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-700">
-                {{ codec }}
-                <button type="button" class="hover:text-blue-900 cursor-pointer" @click="removeCodec(codec)">✕</button>
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="hasFilterChangesInEditMode"
-          class="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Warning: Changing filters will delete automatically added skiplist entries except entries marked Manual and
-          filters that take place after transcoding.
+          <button class="w-full h-10 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100"
+            @click="showModal = true">Filters</button>
         </div>
       </div>
+
+
 
       <!-- Actions -->
       <div class="mt-6 flex justify-end gap-3">
@@ -378,4 +254,12 @@ onMounted(() => {
       </div>
     </div>
   </div>
+
+  <FiltersModal
+    v-if="showModal"
+    :nodes="flowFilters?.nodes"
+    :edges="flowFilters?.edges"
+    @cancel="showModal = false"
+    @save="handleFiltersSave"
+  />
 </template>

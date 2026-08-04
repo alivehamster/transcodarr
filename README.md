@@ -10,7 +10,8 @@ Automanically transcode media in a folder using handbrake
 - Transcoded media filesize compared to original
 
 ## Todo
-- Flow chart filters
+- Add tooltips back
+- Add bitrate filter
 - Group skips by directory
 - Fix History page
 - Add or remove handbrake configs 

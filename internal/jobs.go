@@ -7,10 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/robfig/cron/v3"
 )
@@ -106,111 +103,71 @@ func job(db *sql.DB, id int) {
 	}
 
 	files := getlibItems(lib)
+fileLoop:
 	for _, path := range files {
+
+		currentPath := path
+
+		// Check if the file should be skipped
 		if _, shouldSkip := skipMap[path]; shouldSkip {
 			SaveHistory(db, logMsg(fmt.Sprintf("Skipping: %s", path)))
 			continue
 		}
 
-		info, err := os.Stat(path)
-		if err != nil {
-			log.Printf("Error: %v", err)
-			continue
-		}
-
-		if lib.Config.MinimumFileSizeMb > 0 {
-			minimumBytes := lib.Config.MinimumFileSizeMb * 1024 * 1024
-			if info.Size() < minimumBytes {
-				SaveHistory(db, logMsg(fmt.Sprintf("Skipping file smaller than minimum size (%d MB): %s", lib.Config.MinimumFileSizeMb, path)))
-				err = addSkip(db, id, path, fmt.Sprintf("File is smaller than minimum size (%d MB)", lib.Config.MinimumFileSizeMb))
-				if err != nil {
-					log.Printf("Failed to add to skiplist: %s", err.Error())
+		for _, filter := range lib.Config.Order {
+			switch filter.ID {
+			case "fileAge":
+				if !FileAgeFilter(id, filter, currentPath, db) {
+					continue fileLoop
 				}
-				continue
-			}
-		}
-
-		if lib.Config.Hardlinks {
-			// Cast the Sys() interface to the platform-specific Stat_t type
-			stat, ok := info.Sys().(*syscall.Stat_t)
-			if !ok {
-				log.Println("Not a Unix-like system; cannot check hardlinks and ctime")
-				continue
-			}
-
-			if stat.Nlink > 1 {
-				SaveHistory(db, logMsg(fmt.Sprintf("Skipping file with multiple hardlinks: %s", path)))
-				continue
-			}
-		}
-
-		if lib.Config.FileAge != 0 {
-			if time.Since(info.ModTime()) < (time.Duration(lib.Config.FileAge) * 24 * time.Hour) {
-				SaveHistory(db, logMsg(fmt.Sprintf("Skipping recently changed file: %s", path)))
-				continue
-			}
-		}
-
-		if len(lib.Config.MediaCodec) > 0 {
-			codec, err := getCodec(path)
-			if err != nil {
-				log.Printf("Failed to get codec for %s: %s", path, err.Error())
-				continue
-			}
-			if slices.Contains(lib.Config.MediaCodec, codec) {
-				SaveHistory(db, logMsg(fmt.Sprintf("Skipping file with codec %s: %s", codec, path)))
-
-				err = addSkip(db, id, path, fmt.Sprintf("Codec is already %s", codec))
-				if err != nil {
-					log.Printf("Failed to add to skiplist: %s", err.Error())
+			case "minimumFileSize":
+				if !MinSizeFilter(id, filter, currentPath, db) {
+					continue fileLoop
 				}
-				continue
-			}
-		}
-
-		SaveHistory(db, logMsg(fmt.Sprintf("Processing: %s", path)))
-
-		// after transcoding compare new to initial file size
-		filename := filepath.Base(path)
-		dir := filepath.Dir(path)
-		ext := filepath.Ext(filename)
-		nameWithoutExt := strings.TrimSuffix(filename, ext)
-		outputDir := dir
-		if strings.TrimSpace(lib.Config.CacheDir) != "" {
-			outputDir = lib.Config.CacheDir
-			if err := os.MkdirAll(outputDir, 0755); err != nil {
-				log.Printf("Failed to create cache directory: %s", err.Error())
-				continue
-			}
-		}
-		outputPath := filepath.Join(outputDir, nameWithoutExt+".tmp"+ext)
-
-		if err := transcode(lib.Config, path, outputPath); err != nil {
-			SaveHistory(db, logMsg(fmt.Sprintf("Failed to transcode: %s", err.Error())))
-			os.Remove(outputPath)
-			continue
-		}
-
-		if lib.Config.Filesize {
-			outputInfo, err := os.Stat(outputPath)
-			if err != nil {
-				log.Printf("Failed to get output file info: %s", err.Error())
-				continue
-			}
-			if outputInfo.Size() >= info.Size() {
-				SaveHistory(db, logMsg(fmt.Sprintf("Transcoded file is not smaller, skipping replacement: %s", path)))
-				os.Remove(outputPath)
-				err = addSkip(db, id, path, "Transcoded file is not smaller")
-				if err != nil {
-					log.Printf("Failed to add to skiplist: %s", err.Error())
+			case "hardlinks":
+				if !HardlinkFilter(id, filter, currentPath, db) {
+					continue fileLoop
 				}
-				continue
+			case "mediaCodec":
+				if !CodecFilter(id, filter, currentPath, db) {
+					continue fileLoop
+				}
+			case "newFileSize":
+				if !NewFileSizeFilter(id, filter, path, currentPath, db) {
+					continue fileLoop
+				}
+			case "transcode":
+
+				SaveHistory(db, logMsg(fmt.Sprintf("Processing: %s", path)))
+
+				filename := filepath.Base(path)
+				dir := filepath.Dir(path)
+				ext := filepath.Ext(filename)
+				nameWithoutExt := strings.TrimSuffix(filename, ext)
+				outputDir := dir
+				if strings.TrimSpace(lib.Config.CacheDir) != "" {
+					outputDir = lib.Config.CacheDir
+					if err := os.MkdirAll(outputDir, 0755); err != nil {
+						log.Printf("Failed to create cache directory: %s", err.Error())
+						continue fileLoop
+					}
+				}
+				currentPath := filepath.Join(outputDir, nameWithoutExt+".tmp"+ext)
+
+				if err := transcode(lib.Config, path, currentPath); err != nil {
+					SaveHistory(db, logMsg(fmt.Sprintf("Failed to transcode: %s", err.Error())))
+					os.Remove(currentPath)
+					continue fileLoop
+				}
+
+			default:
+				log.Printf("Unknown filter ID: %s", filter.ID)
 			}
 		}
 
-		if err := replaceFile(outputPath, path); err != nil {
+		if err := replaceFile(currentPath, path); err != nil {
 			log.Printf("Failed to replace original file: %s", err.Error())
-			continue
+			continue fileLoop
 		}
 
 		err = addSkip(db, id, path, "Successfully transcoded")

@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/robfig/cron/v3"
@@ -14,15 +15,19 @@ type Library struct {
 }
 
 type Config struct {
-	Dirs              []string `json:"dirs"`
-	HandbrakeCategory string   `json:"handbrakeCategory"`
-	HandbrakeProfile  string   `json:"handbrakeProfile"`
-	CacheDir          string   `json:"cacheDir"`
-	FileAge           int      `json:"fileAge"`
-	MinimumFileSizeMb int64    `json:"minimumFileSizeMb"`
-	Hardlinks         bool     `json:"hardlinks"`
-	MediaCodec        []string `json:"mediaCodec"`
-	Filesize          bool     `json:"filesize"`
+	Dirs              []string        `json:"dirs"`
+	HandbrakeCategory string          `json:"handbrakeCategory"`
+	HandbrakeProfile  string          `json:"handbrakeProfile"`
+	CacheDir          string          `json:"cacheDir"`
+	Nodes             json.RawMessage `json:"nodes"`
+	Edges             json.RawMessage `json:"edges"`
+	Order             []Order         `json:"order"`
+}
+type Order struct {
+	ID         string   `json:"id"`
+	Int        int      `json:"data_int"`
+	SkipFuture bool     `json:"skipFuture"`
+	Array      []string `json:"data_array"`
 }
 
 type Skip struct {
