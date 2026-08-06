@@ -10,7 +10,6 @@ Automate transcoding media using handbrake
 - Transcoded media filesize compared to original
 
 ## Todo
-- Add bitrate filter
 - Allow inverting filters
 - Group skips by directory
 - Fix History page

@@ -6,6 +6,7 @@ import baseNode from './base.vue'
 
 interface CodecData {
   id: string
+  label: string
   mediaCodecs: string[]
   skipFuture: boolean
 }
@@ -29,7 +30,7 @@ function removeCodec(codec: string) {
 </script>
 
 <template>
-  <baseNode label="Codec Filter" v-model:skipFuture="props.data.skipFuture">
+  <baseNode :label="props.data.label" v-model:skipFuture="props.data.skipFuture">
 
     <div class="flex gap-2">
       <select v-model="selectedCodec"

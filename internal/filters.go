@@ -129,3 +129,24 @@ func NewFileSizeFilter(id int, data Order, path string, outputPath string, db *s
 	}
 	return true
 }
+
+func BitrateFilter(id int, data Order, path string, db *sql.DB) bool {
+
+	bitrate, err := getBitrate(path)
+	if err != nil {
+		log.Printf("Failed to get bitrate for %s: %s", path, err.Error())
+		return false
+	}
+	if bitrate < data.Int {
+		SaveHistory(db, logMsg(fmt.Sprintf("Skipping file with bitrate lower than %d kbps: %s", data.Int, path)))
+		if data.SkipFuture {
+			err = addSkip(db, id, path, fmt.Sprintf("File has lower bitrate than %d kbps", data.Int))
+			if err != nil {
+				log.Printf("Failed to add to skiplist: %s", err.Error())
+			}
+		}
+		return false
+	}
+
+	return true
+}

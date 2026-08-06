@@ -12,8 +12,21 @@ export const filters = [
     tooltip: 'Skip if file is smaller than this size in MB',
     data: { id: 'minimumFileSize', label: 'Minimum Size', placeholder: 'MB', skipFuture: true },
   },
-  { type: 'noinput', tooltip: 'Skip if file has hardlinks', data: { id: 'hardlinks', label: 'Hardlinks', skipFuture: false } },
-  { type: 'noinput', tooltip: 'Skip if the original file size is smaller than the transcoded file', data: { id: 'newFileSize', label: 'Original File Size', skipFuture: true } },
+  {
+    type: 'number',
+    tooltip: 'Skip if file has lower bitrate than this value in kbps',
+    data: { id: 'bitrate', label: 'Bitrate', placeholder: 'kbps', skipFuture: true },
+  },
+  {
+    type: 'noinput',
+    tooltip: 'Skip if file has hardlinks',
+    data: { id: 'hardlinks', label: 'Hardlinks', skipFuture: false },
+  },
+  {
+    type: 'noinput',
+    tooltip: 'Skip if the original file size is smaller than the transcoded file',
+    data: { id: 'newFileSize', label: 'Original File Size', skipFuture: true },
+  },
   {
     type: 'codec',
     tooltip: 'Skip if media codec is in the selected list',

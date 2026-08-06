@@ -136,6 +136,10 @@ fileLoop:
 				if !NewFileSizeFilter(id, filter, path, currentPath, db) {
 					continue fileLoop
 				}
+			case "bitrate":
+				if !BitrateFilter(id, filter, currentPath, db) {
+					continue fileLoop
+				}
 			case "transcode":
 
 				SaveHistory(db, logMsg(fmt.Sprintf("Processing: %s", path)))

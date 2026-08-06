@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -75,6 +76,47 @@ func getCodec(path string) (string, error) {
 		return "", nil
 	}
 	return result.Streams[0].CodecName, nil
+}
+
+func getBitrate(path string) (int, error) {
+	out, err := exec.Command("ffprobe",
+		"-v", "error",
+		"-show_entries", "format=bit_rate:stream=bit_rate",
+		"-of", "json",
+		path,
+	).Output()
+	if err != nil {
+		return 0, err
+	}
+
+	var result struct {
+		Format struct {
+			BitRate string `json:"bit_rate"`
+		} `json:"format"`
+		Streams []struct {
+			BitRate string `json:"bit_rate"`
+		} `json:"streams"`
+	}
+	if err := json.Unmarshal(out, &result); err != nil {
+		return 0, err
+	}
+
+	bitrateValue := strings.TrimSpace(result.Format.BitRate)
+	if bitrateValue == "" || bitrateValue == "N/A" {
+		if len(result.Streams) > 0 {
+			bitrateValue = strings.TrimSpace(result.Streams[0].BitRate)
+		}
+	}
+	if bitrateValue == "" || bitrateValue == "N/A" {
+		return 0, nil
+	}
+
+	bitrate, err := strconv.Atoi(bitrateValue)
+	if err != nil {
+		return 0, err
+	}
+
+	return bitrate / 1000, nil
 }
 
 func logMsg(msg string) string {
