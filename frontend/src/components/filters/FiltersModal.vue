@@ -7,51 +7,40 @@ import {
   type Edge,
 } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
-import { save, type OrderedFilter } from './filters'
+import { filters, genOrder, genNodes, genEdges, createNodeId, type OrderedFilter } from './filters'
 
+// nodes
 import codec from './nodes/codec.vue'
 import number from './nodes/number.vue'
 import noinput from './nodes/noinput.vue'
 
+import Tooltip from '../Tooltip.vue'
+
 const props = defineProps<{
-  nodes?: Node[]
-  edges?: Edge[]
+  order?: OrderedFilter[]
 }>()
 
 const emit = defineEmits<{
   cancel: []
-  save: [payload: { nodes: Node[]; edges: Edge[]; order: OrderedFilter[] }]
+  save: [payload: OrderedFilter[]]
 }>()
 
 const { onConnect, onEdgeUpdateStart, onEdgeUpdate, onEdgeUpdateEnd, addEdges, updateEdge, removeEdges, addNodes, toObject, getEdges } = useVueFlow()
 
-const filters = [
-  { type: 'number', data: { id: 'fileAge', label: 'File Age', placeholder: 'Days', skipFuture: false } },
-  { type: 'number', data: { id: 'minimumFileSize', label: 'Minimum Size', placeholder: 'MB', skipFuture: true } },
-  { type: 'noinput', data: { id: 'hardlinks', label: 'Hardlinks', skipFuture: false } },
-  { type: 'noinput', data: { id: 'newFileSize', label: 'Original File Size', skipFuture: true } },
-  { type: 'codec', data: { id: 'mediaCodec', label: 'Media Codec', mediaCodecs: [], skipFuture: true } },
-]
+
 
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
 const saveError = ref('')
 
 onMounted(async () => {
-  nodes.value = props.nodes || [
-    { id: '1', type: 'input', position: { x: 100, y: 5 }, deletable: false, data: { label: 'Start', id: 'start' } },
-    { id: '2', type: 'default', position: { x: 100, y: 100 }, deletable: false, style: { border: '2px solid #22c55e' }, data: { label: 'Transcode', id: 'transcode' } },
-    { id: '3', type: 'output', position: { x: 100, y: 200 }, deletable: false, data: { label: 'End', id: 'end' } },
-  ]
-  edges.value = props.edges || [
-    { "id": "1-2", "source": "1", "target": "2", "sourceHandle": null, "targetHandle": null, },
-    { "id": "2-3", "source": "2", "target": "3", "sourceHandle": null, "targetHandle": null, }
-  ]
+  nodes.value = genNodes(props.order ?? [])
+  edges.value = genEdges(nodes.value)
 })
 
 function newNode(type?: string, data?: any) {
   const newNode: Node = {
-    id: `node-${Date.now()}`,
+    id: createNodeId(),
     type: type ?? 'default',
     position: { x: 250, y: 250 },
     data: data
@@ -90,22 +79,18 @@ onEdgeUpdateEnd(({ edge }) => {
 })
 
 function log() {
-  console.log(save(toObject()))
+  console.log(genOrder(toObject()))
 }
 
 function handleSave() {
-  const result = save(toObject())
-  if ('error' in result) {
-    saveError.value = result.error
+  const result = genOrder(toObject())
+  if (typeof result === 'string') {
+    saveError.value = result
     return
   }
 
   saveError.value = ''
-  emit('save', {
-    nodes: result.nodes as Node[],
-    edges: result.edges as Edge[],
-    order: result.order,
-  })
+  emit('save', result)
 }
 </script>
 
@@ -119,8 +104,8 @@ function handleSave() {
 
       <div class="flex flex-row min-h-0 flex-1">
         <div class="w-4/5">
-          <VueFlow v-model:nodes="nodes" v-model:edges="edges" edges-updatable="target"
-            :default-viewport="{ x: 100, y: 50, zoom: 1.2 }" :default-zoom="1.5" :min-zoom="0.2" :max-zoom="4">
+          <VueFlow v-model:nodes="nodes" v-model:edges="edges" edges-updatable="target" fit-view-on-init
+            :default-zoom="1.5" :min-zoom="0.2" :max-zoom="4">
             <Background pattern-color="#aaa" :gap="16" />
             <template #node-codec="nodeProps">
               <codec v-bind="nodeProps" />
@@ -136,15 +121,15 @@ function handleSave() {
         <div class="w-1/5 flex flex-col items-center justify-between">
 
           <div class="w-full flex flex-col items-center gap-4 pt-10">
-            <template v-for="filter in filters" :key="filter.data.id">
+              <div v-for="filter in filters" :key="filter.data.id" class="flex w-full items-center justify-center gap-2">
               <button class="bg-blue-500 hover:bg-blue-400 w-3/5 h-15 rounded-lg cursor-pointer"
                 @click="newNode(filter.type, filter.data)">
                 {{
                   filter.data.label }}
               </button>
-            </template>
+              <Tooltip v-if="filter.tooltip" :text="filter.tooltip"></Tooltip>
+              </div>
             <!-- <button class="bg-gray-500 hover:bg-gray-400 w-3/5 h-15 rounded-lg cursor-pointer" @click="log">Log</button> -->
-
 
           </div>
           <div class="w-full flex flex-col items-center gap-4 pb-10">

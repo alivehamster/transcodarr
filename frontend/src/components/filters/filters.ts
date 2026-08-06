@@ -1,14 +1,25 @@
 import type { FlowExportObject } from '@vue-flow/core'
+import Tooltip from '../Tooltip.vue'
 
-export type SaveResult =
-  | { nodes: FlowExportObject['nodes']; edges: FlowExportObject['edges']; order: OrderedFilter[] }
-  | { error: string }
-
-export function save(stuff: FlowExportObject): SaveResult {
-  const result = genOrder(stuff)
-  if (typeof result === 'string') return { error: result }
-  return { nodes: stuff.nodes, edges: stuff.edges, order: result }
-}
+export const filters = [
+  {
+    type: 'number',
+    tooltip: 'Skip if file is newer than this number of days',
+    data: { id: 'fileAge', label: 'File Age', placeholder: 'Days', skipFuture: false },
+  },
+  {
+    type: 'number',
+    tooltip: 'Skip if file is smaller than this size in MB',
+    data: { id: 'minimumFileSize', label: 'Minimum Size', placeholder: 'MB', skipFuture: true },
+  },
+  { type: 'noinput', tooltip: 'Skip if file has hardlinks', data: { id: 'hardlinks', label: 'Hardlinks', skipFuture: false } },
+  { type: 'noinput', tooltip: 'Skip if the original file size is smaller than the transcoded file', data: { id: 'newFileSize', label: 'Original File Size', skipFuture: true } },
+  {
+    type: 'codec',
+    tooltip: 'Skip if media codec is in the selected list',
+    data: { id: 'mediaCodec', label: 'Media Codec', mediaCodecs: [], skipFuture: true },
+  },
+]
 
 export type OrderedFilter = {
   id: string
@@ -17,7 +28,11 @@ export type OrderedFilter = {
   skipFuture?: boolean
 }
 
-function genOrder(stuff: FlowExportObject): OrderedFilter[] | string {
+export function createNodeId(): string {
+  return `node-${Math.random().toString(36).slice(2, 10)}`
+}
+
+export function genOrder(stuff: FlowExportObject): OrderedFilter[] | string {
   const nextNode = new Map(stuff.edges.map((e) => [e.source, e.target]))
   const hasIncoming = new Set(stuff.edges.map((e) => e.target))
   const nodeById = new Map(stuff.nodes.map((n) => [n.id, n]))
@@ -52,8 +67,104 @@ function genOrder(stuff: FlowExportObject): OrderedFilter[] | string {
     return 'Flow must begin with the Start node and end with the End node'
   if (order[order.length - 1]?.id !== 'end')
     return 'Flow must begin with the Start node and end with the End node'
-  if (!order.some((item) => item.id === 'transcode'))
-    return 'Flow must include the Transcode node'
+  if (!order.some((item) => item.id === 'transcode')) return 'Flow must include the Transcode node'
 
   return order.slice(1, -1)
+}
+
+export function genNodes(order: OrderedFilter[]): FlowExportObject['nodes'] {
+  const nodes: FlowExportObject['nodes'] = [
+    {
+      id: '1',
+      type: 'input',
+      position: { x: 100, y: 0 },
+      deletable: false,
+      data: { label: 'Start', id: 'start' },
+    },
+  ]
+
+  if (order.length === 0) {
+    nodes.push({
+      id: '2',
+      type: 'default',
+      position: { x: 100, y: 100 },
+      deletable: false,
+      style: { border: '2px solid #22c55e' },
+      data: { label: 'Transcode', id: 'transcode' },
+    })
+  }
+
+  let pos = 75
+
+  for (const item of order) {
+    if (item.id === 'transcode') {
+      nodes.push({
+        id: '2',
+        type: 'default',
+        position: { x: 100, y: pos },
+        deletable: false,
+        style: { border: '2px solid #22c55e' },
+        data: { label: 'Transcode', id: 'transcode' },
+      })
+
+      pos += 75
+    } else {
+      const filter = filters.find((f) => f.data.id === item.id)
+      if (filter) {
+        nodes.push({
+          id: createNodeId(),
+          type: filter.type,
+          position: { x: 100, y: pos },
+          data: {
+            ...filter.data,
+            num: item.data_int,
+            mediaCodecs: item.data_array,
+            skipFuture: item.skipFuture,
+          },
+        })
+
+        switch (filter.type) {
+          case 'number':
+            pos += 150
+
+            break
+          case 'codec':
+            pos += 200
+            break
+          default:
+            pos += 100
+        }
+      }
+    }
+  }
+
+  nodes.push({
+    id: '3',
+    type: 'output',
+    position: { x: 100, y: pos },
+    deletable: false,
+    data: { label: 'End', id: 'end' },
+  })
+
+  return nodes
+}
+
+export function genEdges(nodes: FlowExportObject['nodes']): FlowExportObject['edges'] {
+  const edges: FlowExportObject['edges'] = []
+
+  for (let i = 0; i < nodes.length - 1; i++) {
+    const currentNode = nodes[i]
+    const nextNode = nodes[i + 1]
+    if (currentNode && nextNode) {
+      edges.push({
+        id: `${currentNode.id}-${nextNode.id}`,
+        source: currentNode.id,
+        target: nextNode.id,
+        sourceHandle: null,
+        targetHandle: null,
+      })
+    }
+  }
+
+  return edges
 }

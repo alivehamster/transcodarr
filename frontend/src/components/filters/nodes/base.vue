@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Handle, Position} from '@vue-flow/core'
+import Tooltip from '../../Tooltip.vue'
 
 const props = defineProps<{
   label: string
@@ -31,6 +32,7 @@ const emit = defineEmits<{
           @change="emit('update:skipFuture', ($event.target as HTMLInputElement).checked)"
         />
         <label :for="`skipFuture-${props.label}`" class="text-xs text-gray-500 cursor-pointer">Skip on future scans</label>
+        <Tooltip text="If media is filtered out by this node it will be skipped in future scans (Recommended to enable on properties unlikely to change)"></Tooltip>
       </div>
 
       <Handle type="source" :position="Position.Bottom" />

@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"encoding/json"
 	"sync"
 
 	"github.com/robfig/cron/v3"
@@ -15,13 +14,11 @@ type Library struct {
 }
 
 type Config struct {
-	Dirs              []string        `json:"dirs"`
-	HandbrakeCategory string          `json:"handbrakeCategory"`
-	HandbrakeProfile  string          `json:"handbrakeProfile"`
-	CacheDir          string          `json:"cacheDir"`
-	Nodes             json.RawMessage `json:"nodes"`
-	Edges             json.RawMessage `json:"edges"`
-	Order             []Order         `json:"order"`
+	Dirs              []string `json:"dirs"`
+	HandbrakeCategory string   `json:"handbrakeCategory"`
+	HandbrakeProfile  string   `json:"handbrakeProfile"`
+	CacheDir          string   `json:"cacheDir"`
+	Order             []Order  `json:"order"`
 }
 type Order struct {
 	ID         string   `json:"id"`

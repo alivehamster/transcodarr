@@ -24,7 +24,7 @@ function hide() {
 <template>
   <span ref="anchor" class="inline-flex" @mouseenter="show" @mouseleave="hide">
     <span
-      class="inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none"
+      class="inline-flex h-3 w-3 items-center justify-center rounded-full border border-gray-400 text-gray-400 hover:border-gray-600 hover:text-gray-600 cursor-pointer text-xs font-bold leading-none"
     >?</span>
   </span>
   <Teleport to="body">

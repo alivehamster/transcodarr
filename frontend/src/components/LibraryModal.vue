@@ -1,15 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import Tooltip from './Tooltip.vue'
 import FiltersModal from './filters/FiltersModal.vue'
 
 import type { OrderedFilter } from './filters/filters'
-
-type FlowSaveResult = {
-  nodes: any[]
-  edges: any[]
-  order: OrderedFilter[]
-}
 
 interface Library {
   id?: number
@@ -36,7 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const showModal = ref(false)
-const flowFilters = ref<FlowSaveResult | null>(null)
+const filterOrder = ref<OrderedFilter[] | undefined>(undefined)
 
 const profilesByCategory = ref<Record<string, string[]>>({})
 const categories = computed(() => Object.keys(profilesByCategory.value))
@@ -79,8 +72,8 @@ function removeDir(index: number) {
   }
 }
 
-function handleFiltersSave(payload: FlowSaveResult) {
-  flowFilters.value = payload
+function handleFiltersSave(payload: OrderedFilter[]) {
+  filterOrder.value = payload
   showModal.value = false
 }
 
@@ -96,9 +89,7 @@ async function handleSave() {
       handbrakeCategory: selectedCategory.value,
       handbrakeProfile: profile.value,
       cacheDir: cacheDir.value.trim(),
-      nodes: flowFilters.value?.nodes ?? [],
-      edges: flowFilters.value?.edges ?? [],
-      order: flowFilters.value?.order ?? [],
+      order: filterOrder.value ?? [],
     },
   }
 
@@ -134,13 +125,7 @@ onMounted(() => {
         selectedCategory.value = data.config?.handbrakeCategory ?? ''
         profile.value = data.config?.handbrakeProfile ?? ''
         cacheDir.value = data.config?.cacheDir ?? ''
-        if(data.config?.nodes && data.config?.edges && data.config?.order) {
-          flowFilters.value = {
-            nodes: data.config?.nodes ?? [],
-            edges: data.config?.edges ?? [],
-            order: data.config?.order ?? [],
-          }
-        }
+        filterOrder.value = data.config?.order ?? []
       })
       .catch(error => {
         console.error('Error fetching library details:', error)
@@ -257,8 +242,7 @@ onMounted(() => {
 
   <FiltersModal
     v-if="showModal"
-    :nodes="flowFilters?.nodes"
-    :edges="flowFilters?.edges"
+    :order="filterOrder"
     @cancel="showModal = false"
     @save="handleFiltersSave"
   />
