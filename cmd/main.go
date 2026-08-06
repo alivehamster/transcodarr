@@ -184,7 +184,7 @@ func main() {
 	})
 
 	app.Get("/api/history", func(c fiber.Ctx) error {
-		rows, err := db.Query("SELECT text FROM history ORDER BY id DESC")
+		rows, err := db.Query("SELECT text FROM history ORDER BY id DESC LIMIT 1000")
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch history"})
 		}
