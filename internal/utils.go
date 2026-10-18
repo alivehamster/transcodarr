@@ -155,9 +155,13 @@ func getSkipMap(db *sql.DB, libraryID int) (map[string]struct{}, error) {
 }
 
 func replaceFile(src, dst string) error {
-	if err := os.Rename(src, dst); err == nil {
+	err := os.Rename(src, dst)
+	if err == nil {
 		return nil
-	} else if !errors.Is(err, syscall.EXDEV) {
+	}
+	defer os.Remove(src)
+
+	if !errors.Is(err, syscall.EXDEV) {
 		return err
 	}
 
@@ -200,15 +204,6 @@ func replaceFile(src, dst string) error {
 	}
 
 	if err := os.Rename(tempPath, dst); err != nil {
-		if removeErr := os.Remove(dst); removeErr != nil {
-			return err
-		}
-		if err := os.Rename(tempPath, dst); err != nil {
-			return err
-		}
-	}
-
-	if err := os.Remove(src); err != nil {
 		return err
 	}
 

@@ -156,7 +156,7 @@ fileLoop:
 						continue fileLoop
 					}
 				}
-				currentPath := filepath.Join(outputDir, nameWithoutExt+".tmp"+ext)
+				currentPath = filepath.Join(outputDir, nameWithoutExt+".tmp"+ext)
 
 				if err := transcode(lib.Config, path, currentPath); err != nil {
 					SaveHistory(db, logMsg(fmt.Sprintf("Failed to transcode: %s", err.Error())))
