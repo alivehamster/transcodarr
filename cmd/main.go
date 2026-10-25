@@ -190,7 +190,7 @@ func main() {
 		}
 		defer rows.Close()
 
-		var history []string
+		history := []string{}
 		for rows.Next() {
 			var text string
 			if err := rows.Scan(&text); err != nil {
@@ -355,6 +355,15 @@ func main() {
 		_, err = db.Exec("DELETE FROM skiplist WHERE id = ?", id)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete skip"})
+		}
+
+		return c.SendStatus(fiber.StatusOK)
+	})
+
+	app.Delete("/api/history/clear", func(c fiber.Ctx) error {
+		_, err := db.Exec("DELETE FROM history")
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to clear history"})
 		}
 
 		return c.SendStatus(fiber.StatusOK)
