@@ -14,5 +14,12 @@
     >
       History
     </RouterLink>
+    <RouterLink
+      to="/profile"
+      class="text-sm font-medium text-gray-600 hover:text-gray-900"
+      active-class="text-blue-600"
+    >
+      Profile
+    </RouterLink>
   </nav>
 </template>

@@ -16,6 +16,11 @@ const router = createRouter({
       name: 'history',
       component: History,
     },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('@/views/CustomProfile.vue'),
+    }
   ],
 })
 

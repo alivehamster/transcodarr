@@ -153,6 +153,16 @@ func main() {
 		return c.JSON(profiles)
 	})
 
+	app.Get("/api/customProfile", func(c fiber.Ctx) error {
+		data, err := os.ReadFile("config/custom-presets.json")
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to read custom profile"})
+		}
+
+		c.Set("Content-Type", "application/json")
+		return c.Send(data)
+	})
+
 	app.Get("/api/skiplist/:id", func(c fiber.Ctx) error {
 		idstr := c.Params("id")
 
@@ -324,6 +334,19 @@ func main() {
 		}
 
 		return c.JSON(lib)
+	})
+
+	app.Put("/api/setCustomProfile", func(c fiber.Ctx) error {
+		data := c.Body()
+		if !json.Valid(data) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid JSON"})
+		}
+
+		if err := os.WriteFile("config/custom-presets.json", data, 0644); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to save custom profile"})
+		}
+
+		return c.SendStatus(fiber.StatusOK)
 	})
 
 	app.Delete("/api/deleteLibrary/:id", func(c fiber.Ctx) error {
