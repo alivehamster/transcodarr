@@ -40,3 +40,15 @@ type JobScheduler struct {
 	mu        sync.Mutex
 	jobMu     sync.Mutex
 }
+
+type mediaInfoOutput struct {
+	Media struct {
+		Track []struct {
+			Type           string `json:"@type"`
+			Format         string `json:"Format"`
+			CodecID        string `json:"CodecID"`
+			OverallBitRate string `json:"OverallBitRate"` // bits/sec (on "General" track)
+			BitRate        string `json:"BitRate"`        // bits/sec (on "Video" track)
+		} `json:"track"`
+	} `json:"media"`
+}

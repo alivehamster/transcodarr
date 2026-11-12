@@ -53,70 +53,63 @@ func getlibItems(lib Library) []string {
 	return paths
 }
 
+func probeMediaInfo(path string) (*mediaInfoOutput, error) {
+	out, err := exec.Command("mediainfo", "--Output=JSON", path).Output()
+	if err != nil {
+		return nil, err
+	}
+	var res mediaInfoOutput
+	if err := json.Unmarshal(out, &res); err != nil {
+		return nil, err
+	}
+	return &res, nil
+}
+
 func getCodec(path string) (string, error) {
-	out, err := exec.Command("ffprobe",
-		"-v", "error",
-		"-select_streams", "v:0",
-		"-show_entries", "stream=codec_name",
-		"-of", "json",
-		path,
-	).Output()
+	info, err := probeMediaInfo(path)
 	if err != nil {
 		return "", err
 	}
-	var result struct {
-		Streams []struct {
-			CodecName string `json:"codec_name"`
-		} `json:"streams"`
+	for _, t := range info.Media.Track {
+		if t.Type == "Video" {
+			return strings.ToLower(strings.TrimSpace(t.Format)), nil
+		}
 	}
-	if err := json.Unmarshal(out, &result); err != nil {
-		return "", err
-	}
-	if len(result.Streams) == 0 {
-		return "", nil
-	}
-	return result.Streams[0].CodecName, nil
+	return "", nil
 }
 
 func getBitrate(path string) (int, error) {
-	out, err := exec.Command("ffprobe",
-		"-v", "error",
-		"-show_entries", "format=bit_rate:stream=bit_rate",
-		"-of", "json",
-		path,
-	).Output()
+	info, err := probeMediaInfo(path)
 	if err != nil {
 		return 0, err
 	}
 
-	var result struct {
-		Format struct {
-			BitRate string `json:"bit_rate"`
-		} `json:"format"`
-		Streams []struct {
-			BitRate string `json:"bit_rate"`
-		} `json:"streams"`
-	}
-	if err := json.Unmarshal(out, &result); err != nil {
-		return 0, err
-	}
-
-	bitrateValue := strings.TrimSpace(result.Format.BitRate)
-	if bitrateValue == "" || bitrateValue == "N/A" {
-		if len(result.Streams) > 0 {
-			bitrateValue = strings.TrimSpace(result.Streams[0].BitRate)
+	var generalBitrate, videoBitrate string
+	for _, t := range info.Media.Track {
+		switch t.Type {
+		case "General":
+			generalBitrate = strings.TrimSpace(t.OverallBitRate)
+		case "Video":
+			if videoBitrate == "" {
+				videoBitrate = strings.TrimSpace(t.BitRate)
+			}
 		}
 	}
-	if bitrateValue == "" || bitrateValue == "N/A" {
+
+	bitrateValue := generalBitrate
+	if bitrateValue == "" {
+		bitrateValue = videoBitrate
+	}
+	if bitrateValue == "" {
 		return 0, nil
 	}
 
-	bitrate, err := strconv.Atoi(bitrateValue)
+	bitrateFloat, err := strconv.ParseFloat(bitrateValue, 64)
 	if err != nil {
 		return 0, err
 	}
 
-	return bitrate / 1000, nil
+	return int(bitrateFloat) / 1000, nil
 }
 
 func logMsg(msg string) string {

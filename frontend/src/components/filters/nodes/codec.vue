@@ -13,7 +13,18 @@ interface CodecData {
 
 const props = defineProps<NodeProps<CodecData>>()
 
-const availableCodecs = ['h264', 'h265', 'av1', 'vp9', 'vp8', 'mpeg4', 'mpeg2', 'theora', 'wmv3', 'prores']
+const availableCodecs = [
+  'avc',
+  'hevc',
+  'av1',
+  'vp9',
+  'vp8',
+  'mpeg-4 visual',
+  'mpeg video',
+  'theora',
+  'vc-1',
+  'prores',
+];
 
 const selectedCodec = ref<string | null>(null)
 

@@ -34,8 +34,9 @@ const edges = ref<Edge[]>([])
 const saveError = ref('')
 
 onMounted(async () => {
-  nodes.value = genNodes(props.order ?? [])
-  edges.value = genEdges(nodes.value)
+  const generated = genNodes(props.order ?? [])
+  nodes.value = generated
+  edges.value = genEdges(generated)
 })
 
 function newNode(type?: string, data?: any) {
@@ -52,8 +53,8 @@ function newNode(type?: string, data?: any) {
 // Add edge when a connection is made, removing any existing edge on the same handles
 onConnect((params) => {
   const existing = getEdges.value.filter(
-    (e) => e.source === params.source && e.sourceHandle === params.sourceHandle
-      || e.target === params.target && e.targetHandle === params.targetHandle
+    (e) => (e.source === params.source && e.sourceHandle === params.sourceHandle)
+      || (e.target === params.target && e.targetHandle === params.targetHandle)
   )
   removeEdges(existing)
   addEdges([params])
@@ -121,14 +122,14 @@ function handleSave() {
         <div class="w-1/5 flex flex-col items-center justify-between">
 
           <div class="w-full flex flex-col items-center gap-4 pt-10">
-              <div v-for="filter in filters" :key="filter.data.id" class="flex w-full items-center justify-center gap-2">
+            <div v-for="filter in filters" :key="filter.data.id" class="flex w-full items-center justify-center gap-2">
               <button class="bg-blue-500 hover:bg-blue-400 w-3/5 h-15 rounded-lg cursor-pointer"
                 @click="newNode(filter.type, filter.data)">
                 {{
                   filter.data.label }}
               </button>
               <Tooltip v-if="filter.tooltip" :text="filter.tooltip"></Tooltip>
-              </div>
+            </div>
             <!-- <button class="bg-gray-500 hover:bg-gray-400 w-3/5 h-15 rounded-lg cursor-pointer" @click="log">Log</button> -->
 
           </div>
