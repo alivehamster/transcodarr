@@ -7,10 +7,6 @@ interface Library {
   id: number
   name: string
   cron: string
-  config: {
-    dirs: string[]
-    profile: string
-  }
 }
 
 const libraries = ref<Library[]>([])

@@ -40,6 +40,7 @@ const dirs = ref<string[]>([''])
 const selectedCategory = ref('')
 const profile = ref('')
 const cacheDir = ref('')
+const saveError = ref('')
 
 const errors = ref({
   name: false,
@@ -79,6 +80,7 @@ function handleFiltersSave(payload: OrderedFilter[]) {
 
 async function handleSave() {
   if (!validate()) return
+  saveError.value = ''
 
   const payload: Library = {
     id: props.id,
@@ -104,12 +106,15 @@ async function handleSave() {
     })
 
     if (!saveResponse.ok) {
-      throw new Error(`Failed to save library: ${saveResponse.status}`)
+      const responseBody = await saveResponse.json()
+      const message = responseBody.error ?? `Failed to save library: ${saveResponse.status}`
+      throw new Error(message)
     }
 
     emit('saved')
   } catch (error) {
     console.error('Error saving library:', error)
+    saveError.value = error instanceof Error ? error.message : 'Failed to save library.'
   }
 }
 
@@ -226,6 +231,9 @@ onMounted(() => {
 
       <!-- Actions -->
       <div class="mt-6 flex justify-end gap-3">
+        <p v-if="saveError" class="mr-auto self-center text-sm text-red-600" role="alert">
+          {{ saveError }}
+        </p>
         <button type="button"
           class="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer"
           @click="emit('cancel')">

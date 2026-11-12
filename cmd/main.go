@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/static"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/robfig/cron/v3"
 )
 
 var videoExtensions = map[string]struct{}{
@@ -286,6 +287,11 @@ func main() {
 			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
 		}
 
+		_, err := cron.ParseStandard(lib.Cron)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid cron expression"})
+		}
+
 		configJSON, err := json.Marshal(lib.Config)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to serialize config"})
@@ -311,6 +317,11 @@ func main() {
 		var lib internal.Library
 		if err := c.Bind().JSON(&lib); err != nil {
 			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
+		}
+
+		_, err := cron.ParseStandard(lib.Cron)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid cron expression"})
 		}
 
 		configJSON, err := json.Marshal(lib.Config)
