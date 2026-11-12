@@ -112,6 +112,7 @@ func main() {
 			if err := rows.Scan(&lib.ID, &lib.Name, &lib.Cron); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse library data"})
 			}
+			lib.NextRun = js.NextRun(lib.ID)
 			libraries = append(libraries, lib)
 		}
 		if err := rows.Err(); err != nil {

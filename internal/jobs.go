@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/robfig/cron/v3"
 )
@@ -77,6 +78,19 @@ func (js *JobScheduler) runJob(db *sql.DB, id int) {
 	js.jobMu.Lock()
 	defer js.jobMu.Unlock()
 	job(db, id)
+}
+
+func (js *JobScheduler) NextRun(libID int) string {
+	js.mu.Lock()
+	defer js.mu.Unlock()
+
+	if entryID, exists := js.jobMap[libID]; exists {
+		entry := js.scheduler.Entry(entryID)
+		if !entry.Next.IsZero() {
+			return entry.Next.UTC().Format(time.RFC3339)
+		}
+	}
+	return ""
 }
 
 func job(db *sql.DB, id int) {

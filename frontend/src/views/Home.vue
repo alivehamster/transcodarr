@@ -7,6 +7,7 @@ interface Library {
   id: number
   name: string
   cron: string
+  nextRun: string | undefined
 }
 
 const libraries = ref<Library[]>([])
@@ -14,6 +15,11 @@ const showModal = ref(false)
 const editingId = ref<number | undefined>(undefined)
 const showSkiplistModal = ref(false)
 const skiplistLibraryId = ref<number | undefined>(undefined)
+
+const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
 
 async function fetchLibraries() {
   try {
@@ -66,6 +72,13 @@ function onSaved() {
   showModal.value = false
   fetchLibraries()
 }
+
+function formatNextRun(nextRun: string | undefined) {
+  if (!nextRun) return ''
+  const date = new Date(nextRun)
+  if (Number.isNaN(date.getTime())) return nextRun
+  return dateTimeFormatter.format(date)
+}
 </script>
 
 <template>
@@ -89,6 +102,9 @@ function onSaved() {
       >
         <h2 class="text-lg font-medium">{{ lib.name }}</h2>
         <p class="mt-1 text-sm text-gray-500">Schedule: {{ lib.cron }}</p>
+        <p v-if="lib.nextRun" class="mt-1 text-sm text-gray-500">
+          Next run: <time :datetime="lib.nextRun">{{ formatNextRun(lib.nextRun) }}</time>
+        </p>
         <div class="mt-3 flex gap-2">
           <button
             class="rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-100 cursor-pointer"
