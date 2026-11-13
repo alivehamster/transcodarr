@@ -122,6 +122,11 @@ func main() {
 		return c.JSON(libraries)
 	})
 
+	app.Get("/api/runningJob", func(c fiber.Ctx) error {
+		job := js.RunningJob()
+		return c.JSON(fiber.Map{"job": job})
+	})
+
 	app.Get("/api/library/:id", func(c fiber.Ctx) error {
 		idstr := c.Params("id")
 

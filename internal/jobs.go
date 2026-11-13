@@ -77,7 +77,21 @@ func (js *JobScheduler) DeleteJob(libID int) {
 func (js *JobScheduler) runJob(db *sql.DB, id int) {
 	js.jobMu.Lock()
 	defer js.jobMu.Unlock()
+	js.currentJobMu.Lock()
+	js.currentJob = id
+	js.currentJobMu.Unlock()
+	defer func() {
+		js.currentJobMu.Lock()
+		js.currentJob = 0
+		js.currentJobMu.Unlock()
+	}()
 	job(db, id)
+}
+
+func (js *JobScheduler) RunningJob() int {
+	js.currentJobMu.RLock()
+	defer js.currentJobMu.RUnlock()
+	return js.currentJob
 }
 
 func (js *JobScheduler) NextRun(libID int) string {
@@ -124,7 +138,6 @@ fileLoop:
 
 		// Check if the file should be skipped
 		if _, shouldSkip := skipMap[path]; shouldSkip {
-			SaveHistory(db, logMsg(fmt.Sprintf("Skipping: %s", path)))
 			continue
 		}
 

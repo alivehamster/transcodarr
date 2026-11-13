@@ -29,3 +29,4 @@ docker run -p 8080:8080 -e TZ=TimeZone -v ./config:/app/config -v /path/on/host:
 - Fix History page
 - Time since last scan
 - Webhooks after scans
+- Allow multiple handbrake instances at once

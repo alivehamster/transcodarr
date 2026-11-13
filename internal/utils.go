@@ -147,7 +147,7 @@ func getSkipMap(db *sql.DB, libraryID int) (map[string]struct{}, error) {
 	return skipMap, nil
 }
 
-func replaceFile(src, dst string) error {
+func replaceFile(src string, dst string) error {
 	err := os.Rename(src, dst)
 	if err == nil {
 		return nil

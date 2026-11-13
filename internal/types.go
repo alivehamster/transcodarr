@@ -35,10 +35,12 @@ type Skip struct {
 }
 
 type JobScheduler struct {
-	scheduler *cron.Cron
-	jobMap    map[int]cron.EntryID
-	mu        sync.Mutex
-	jobMu     sync.Mutex
+	scheduler    *cron.Cron
+	jobMap       map[int]cron.EntryID
+	mu           sync.Mutex
+	jobMu        sync.Mutex
+	currentJobMu sync.RWMutex
+	currentJob   int
 }
 
 type mediaInfoOutput struct {

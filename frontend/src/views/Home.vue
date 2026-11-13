@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { ring } from 'ldrs'
+
 import LibraryModal from '../components/LibraryModal.vue'
 import SkiplistModal from '../components/SkiplistModal.vue'
 
@@ -11,6 +13,7 @@ interface Library {
 }
 
 const libraries = ref<Library[]>([])
+const jobInProgress = ref(0)
 const showModal = ref(false)
 const editingId = ref<number | undefined>(undefined)
 const showSkiplistModal = ref(false)
@@ -21,6 +24,21 @@ const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   timeStyle: 'short',
 })
 
+async function fetchCurrentJob() {
+    try {
+    const response = await fetch('/api/runningJob')
+      const data = await response.json()
+    jobInProgress.value = data?.job || 0
+    } catch (error) {
+      console.error('Error fetching job in progress:', error)
+    }
+}
+
+function startJobPolling() {
+  fetchCurrentJob()
+  setInterval(fetchCurrentJob, 10000)
+}
+
 async function fetchLibraries() {
   try {
     const response = await fetch('/api/libraries')
@@ -30,7 +48,11 @@ async function fetchLibraries() {
   }
 }
 
-onMounted(fetchLibraries)
+onMounted(() => {
+  ring.register()
+  fetchLibraries()
+  startJobPolling()
+})
 
 function openCreate() {
   editingId.value = undefined
@@ -52,7 +74,7 @@ async function deleteLibrary(id: number) {
     await fetch(`/api/deleteLibrary/${id}`, {
       method: 'DELETE',
     })
-    libraries.value = libraries.value.filter(l => l.id !== id)
+    libraries.value = libraries.value.filter((l) => l.id !== id)
   } catch (error) {
     console.error('Error deleting library:', error)
   }
@@ -63,6 +85,7 @@ async function startScan(id: number) {
     await fetch(`/api/run/${id}`, {
       method: 'POST',
     })
+    fetchCurrentJob()
   } catch (error) {
     console.error('Error starting scan for library:', error)
   }
@@ -79,11 +102,16 @@ function formatNextRun(nextRun: string | undefined) {
   if (Number.isNaN(date.getTime())) return nextRun
   return dateTimeFormatter.format(date)
 }
+
+function getLibName(id: number) {
+  const lib = libraries.value.find((l) => l.id === id)
+  return lib ? lib.name : ''
+}
 </script>
 
 <template>
   <div class="p-6">
-    <div class="mb-4 flex items-center justify-between">
+    <div class="mb-2 flex items-center justify-between">
       <h1 class="text-2xl font-semibold">Libraries</h1>
       <button
         class="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 cursor-pointer"
@@ -93,7 +121,17 @@ function formatNextRun(nextRun: string | undefined) {
       </button>
     </div>
 
-    <div v-if="libraries === null || libraries.length === 0" class="text-gray-500">No libraries found.</div>
+    <div v-if="jobInProgress !== 0" class="flex flex-col mb-4 bg-gray-300 p-4 rounded-lg">
+      <h2 class="text-lg">Job in Progress:</h2>
+      <span class="flex items-center gap-2">
+        <l-ring size="12" stroke="2" bg-opacity="0" speed="2" color="black"></l-ring>
+        <p>{{ getLibName(jobInProgress) }}</p>
+      </span>
+    </div>
+
+    <div v-if="libraries === null || libraries.length === 0" class="text-gray-500">
+      No libraries found.
+    </div>
     <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div
         v-for="lib in libraries"
@@ -135,12 +173,7 @@ function formatNextRun(nextRun: string | undefined) {
     </div>
   </div>
 
-  <LibraryModal
-    v-if="showModal"
-    :id="editingId"
-    @cancel="showModal = false"
-    @saved="onSaved"
-  />
+  <LibraryModal v-if="showModal" :id="editingId" @cancel="showModal = false" @saved="onSaved" />
 
   <SkiplistModal
     v-if="showSkiplistModal && skiplistLibraryId !== undefined"
