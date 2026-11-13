@@ -27,6 +27,5 @@ docker run -p 8080:8080 -e TZ=TimeZone -v ./config:/app/config -v /path/on/host:
 - Allow inverting filters
 - Group skips by directory
 - Fix History page
-- Time since last scan
 - Webhooks after scans
-- Allow multiple handbrake instances at once
+- Allow multiple handbrake transcodes at once

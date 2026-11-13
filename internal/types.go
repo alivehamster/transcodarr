@@ -12,6 +12,7 @@ type Library struct {
 	Cron    string `json:"cron"`
 	Config  Config `json:"config"`
 	NextRun string `json:"nextRun"`
+	LastRun string `json:"lastRun"`
 }
 
 type Config struct {

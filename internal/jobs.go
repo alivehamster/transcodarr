@@ -33,7 +33,7 @@ func (js *JobScheduler) StartJobs(db *sql.DB) error {
 			return err
 		}
 		id, _ := js.scheduler.AddFunc(lib.Cron, func() {
-			js.runJob(db, lib.ID)
+			js.RunJob(db, lib.ID)
 		})
 		js.jobMap[lib.ID] = id
 	}
@@ -54,7 +54,7 @@ func (js *JobScheduler) EditSchedule(db *sql.DB, lib Library) error {
 	}
 
 	id, err := js.scheduler.AddFunc(lib.Cron, func() {
-		js.runJob(db, lib.ID)
+		js.RunJob(db, lib.ID)
 	})
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func (js *JobScheduler) DeleteJob(libID int) {
 	}
 }
 
-func (js *JobScheduler) runJob(db *sql.DB, id int) {
+func (js *JobScheduler) RunJob(db *sql.DB, id int) {
 	js.jobMu.Lock()
 	defer js.jobMu.Unlock()
 	js.currentJobMu.Lock()
@@ -207,7 +207,5 @@ fileLoop:
 		}
 	}
 
-}
-func RunJob(db *sql.DB, js *JobScheduler, id int) {
-	js.runJob(db, id)
+	db.Exec("UPDATE libraries SET lastRun = ? WHERE id = ?", time.Now().UTC().Format(time.RFC3339), id)
 }

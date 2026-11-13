@@ -9,6 +9,7 @@ interface Library {
   id: number
   name: string
   cron: string
+  lastRun: string | undefined
   nextRun: string | undefined
 }
 
@@ -96,10 +97,10 @@ function onSaved() {
   fetchLibraries()
 }
 
-function formatNextRun(nextRun: string | undefined) {
-  if (!nextRun) return ''
-  const date = new Date(nextRun)
-  if (Number.isNaN(date.getTime())) return nextRun
+function formatDate(dateString: string | undefined) {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  if (Number.isNaN(date.getTime())) return dateString
   return dateTimeFormatter.format(date)
 }
 
@@ -140,8 +141,11 @@ function getLibName(id: number) {
       >
         <h2 class="text-lg font-medium">{{ lib.name }}</h2>
         <p class="mt-1 text-sm text-gray-500">Schedule: {{ lib.cron }}</p>
+        <p v-if="lib.lastRun" class="mt-1 text-sm text-gray-500">
+          Last run: <time :datetime="lib.lastRun">{{ formatDate(lib.lastRun) }}</time>
+        </p>
         <p v-if="lib.nextRun" class="mt-1 text-sm text-gray-500">
-          Next run: <time :datetime="lib.nextRun">{{ formatNextRun(lib.nextRun) }}</time>
+          Next run: <time :datetime="lib.nextRun">{{ formatDate(lib.nextRun) }}</time>
         </p>
         <div class="mt-3 flex gap-2">
           <button

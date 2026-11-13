@@ -70,6 +70,7 @@ func main() {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT,
 			cron TEXT,
+			lastRun TEXT,
 			config TEXT
 		);
 		CREATE TABLE IF NOT EXISTS history (
@@ -101,7 +102,7 @@ func main() {
 	app.Get("/api/libraries", func(c fiber.Ctx) error {
 		var libraries []internal.Library
 
-		rows, err := db.Query("SELECT id, name, cron FROM libraries")
+		rows, err := db.Query("SELECT id, name, cron, COALESCE(lastRun, '') FROM libraries")
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch libraries"})
 		}
@@ -109,7 +110,7 @@ func main() {
 
 		for rows.Next() {
 			var lib internal.Library
-			if err := rows.Scan(&lib.ID, &lib.Name, &lib.Cron); err != nil {
+			if err := rows.Scan(&lib.ID, &lib.Name, &lib.Cron, &lib.LastRun); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse library data"})
 			}
 			lib.NextRun = js.NextRun(lib.ID)
@@ -417,7 +418,7 @@ func main() {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
 		}
 
-		go internal.RunJob(db, js, id)
+		go js.RunJob(db, id)
 
 		return c.JSON(fiber.Map{"message": "Job triggered"})
 	})
