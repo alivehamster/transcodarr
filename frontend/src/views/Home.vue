@@ -29,7 +29,10 @@ async function fetchCurrentJob() {
     try {
     const response = await fetch('/api/runningJob')
       const data = await response.json()
-    jobInProgress.value = data?.job || 0
+    if (jobInProgress.value !== data.job) {
+      jobInProgress.value = data.job
+      fetchLibraries()
+    }
     } catch (error) {
       console.error('Error fetching job in progress:', error)
     }
@@ -106,7 +109,7 @@ function formatDate(dateString: string | undefined) {
 
 function getLibName(id: number) {
   const lib = libraries.value.find((l) => l.id === id)
-  return lib ? lib.name : ''
+  return lib ? lib.name : 'unknown library'
 }
 </script>
 
@@ -142,7 +145,7 @@ function getLibName(id: number) {
         <h2 class="text-lg font-medium">{{ lib.name }}</h2>
         <p class="mt-1 text-sm text-gray-500">Schedule: {{ lib.cron }}</p>
         <p v-if="lib.lastRun" class="mt-1 text-sm text-gray-500">
-          Last run: <time :datetime="lib.lastRun">{{ formatDate(lib.lastRun) }}</time>
+          Last completed run: <time :datetime="lib.lastRun">{{ formatDate(lib.lastRun) }}</time>
         </p>
         <p v-if="lib.nextRun" class="mt-1 text-sm text-gray-500">
           Next run: <time :datetime="lib.nextRun">{{ formatDate(lib.nextRun) }}</time>
