@@ -130,7 +130,7 @@ func job(db *sql.DB, id int) {
 		return
 	}
 
-	files := getlibItems(lib)
+	files := GetlibItems(lib)
 fileLoop:
 	for _, path := range files {
 

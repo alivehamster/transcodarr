@@ -28,5 +28,4 @@ docker run -p 8080:8080 -e TZ=TimeZone -v ./config:/app/config -v /path/on/host:
 - Group skips by directory
 - Fix History page
 - Webhooks after scans
-- Allow multiple handbrake transcodes at once
 - Make job in progress a dropdown with logs of active run

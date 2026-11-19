@@ -34,7 +34,7 @@ var videoExtensions = map[string]struct{}{
 	".webm": {},
 }
 
-func getlibItems(lib Library) []string {
+func GetlibItems(lib Library) []string {
 	var paths []string
 
 	for _, dir := range lib.Config.Dirs {

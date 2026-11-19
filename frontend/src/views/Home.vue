@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { ring } from 'ldrs'
 
 import LibraryModal from '../components/LibraryModal.vue'
-import SkiplistModal from '../components/SkiplistModal.vue'
+import SkiplistModal from '../components/Skiplist/SkiplistModal.vue'
 
 interface Library {
   id: number
@@ -145,7 +145,7 @@ function getLibName(id: number) {
         <h2 class="text-lg font-medium">{{ lib.name }}</h2>
         <p class="mt-1 text-sm text-gray-500">Schedule: {{ lib.cron }}</p>
         <p v-if="lib.lastRun" class="mt-1 text-sm text-gray-500">
-          Last completed run: <time :datetime="lib.lastRun">{{ formatDate(lib.lastRun) }}</time>
+          Last run: <time :datetime="lib.lastRun">{{ formatDate(lib.lastRun) }}</time>
         </p>
         <p v-if="lib.nextRun" class="mt-1 text-sm text-gray-500">
           Next run: <time :datetime="lib.nextRun">{{ formatDate(lib.nextRun) }}</time>

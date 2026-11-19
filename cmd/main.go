@@ -3,12 +3,10 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/alivehamster/transcodarr/internal"
 	"github.com/gofiber/fiber/v3"
@@ -201,6 +199,32 @@ func main() {
 		return c.JSON(skiplist)
 	})
 
+	app.Get("/api/libItems/:id", func(c fiber.Ctx) error {
+		idstr := c.Params("id")
+
+		id, err := strconv.Atoi(idstr)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
+		}
+
+		var lib internal.Library
+		var configJSON string
+		row := db.QueryRow("SELECT id, name, cron, config FROM libraries WHERE id = ?", id)
+		if err := row.Scan(&lib.ID, &lib.Name, &lib.Cron, &configJSON); err != nil {
+			if err == sql.ErrNoRows {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Library not found"})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch library"})
+		}
+
+		if err := json.Unmarshal([]byte(configJSON), &lib.Config); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse library config"})
+		}
+
+		items := internal.GetlibItems(lib)
+		return c.JSON(items)
+	})
+
 	app.Get("/api/history", func(c fiber.Ctx) error {
 		rows, err := db.Query("SELECT text FROM history ORDER BY id DESC LIMIT 1000")
 		if err != nil {
@@ -223,56 +247,28 @@ func main() {
 		return c.JSON(history)
 	})
 
-	app.Post("/api/addSkip/:id", func(c fiber.Ctx) error {
-		idstr := c.Params("id")
+	app.Post("/api/updateSkiplist/:id", func(c fiber.Ctx) error {
+		var payload struct {
+			Add    []string `json:"add"`
+			Remove []int    `json:"remove"`
+		}
 
+		idstr := c.Params("id")
 		id, err := strconv.Atoi(idstr)
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid library ID"})
 		}
 
-		var skip internal.Skip
-		if err := c.Bind().JSON(&skip); err != nil {
+		if err := c.Bind().JSON(&payload); err != nil {
 			return c.Status(fiber.StatusBadRequest).SendString(err.Error())
-		}
-
-		skip.Path = strings.TrimSpace(skip.Path)
-		if skip.Path == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Path is required"})
-		}
-
-		pathInfo, err := os.Stat(skip.Path)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Path does not exist"})
-		}
-
-		pathsToAdd := []string{}
-		if pathInfo.IsDir() {
-			err := filepath.WalkDir(skip.Path, func(path string, d fs.DirEntry, walkErr error) error {
-				if walkErr != nil || d.IsDir() {
-					return nil
-				}
-
-				ext := strings.ToLower(filepath.Ext(path))
-				if _, ok := videoExtensions[ext]; ok && !strings.Contains(filepath.Base(path), ".tmp.") {
-					pathsToAdd = append(pathsToAdd, path)
-				}
-
-				return nil
-			})
-			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to scan directory"})
-			}
-		} else {
-			pathsToAdd = append(pathsToAdd, skip.Path)
 		}
 
 		tx, err := db.Begin()
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add skip"})
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update skip"})
 		}
 
-		for _, path := range pathsToAdd {
+		for _, path := range payload.Add {
 			_, err := tx.Exec("INSERT INTO skiplist (library_id, path, description) VALUES (?, ?, ?)", id, path, "Manual")
 			if err != nil {
 				tx.Rollback()
@@ -280,9 +276,17 @@ func main() {
 			}
 		}
 
+		for _, idToRemove := range payload.Remove {
+			_, err = tx.Exec("DELETE FROM skiplist WHERE id = ?", idToRemove)
+			if err != nil {
+				tx.Rollback()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete skip"})
+			}
+		}
+
 		if err := tx.Commit(); err != nil {
 			tx.Rollback()
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add skip"})
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update skip"})
 		}
 
 		return c.SendStatus(fiber.StatusOK)
@@ -381,22 +385,6 @@ func main() {
 		}
 
 		js.DeleteJob(id)
-
-		return c.SendStatus(fiber.StatusOK)
-	})
-
-	app.Delete("/api/removeSkip/:id", func(c fiber.Ctx) error {
-		idstr := c.Params("id")
-
-		id, err := strconv.Atoi(idstr)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid skip ID"})
-		}
-
-		_, err = db.Exec("DELETE FROM skiplist WHERE id = ?", id)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to delete skip"})
-		}
 
 		return c.SendStatus(fiber.StatusOK)
 	})
