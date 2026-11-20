@@ -97,6 +97,6 @@ RUN apt-get install -y --no-install-recommends \
     
 COPY --from=handbrake-builder /usr/local /usr/local
 COPY --from=node-builder /app/dist ./frontend/dist
-COPY --from=builder /app/server .
+COPY --from=go-builder /app/server .
 
 CMD ["/app/server"]
