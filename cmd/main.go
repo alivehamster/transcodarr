@@ -269,7 +269,7 @@ func main() {
 		}
 
 		for _, path := range payload.Add {
-			_, err := tx.Exec("INSERT INTO skiplist (library_id, path, description) VALUES (?, ?, ?)", id, path, "Manual")
+			_, err := tx.Exec("INSERT INTO skiplist (library_id, path, description) VALUES (?, ?, ?)", id, path, "Manually added")
 			if err != nil {
 				tx.Rollback()
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to add skip"})

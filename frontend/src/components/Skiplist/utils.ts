@@ -17,6 +17,7 @@ export class FileNode {
   readonly id: number | null
   readonly name: string
   readonly path: string
+  readonly description: string
   readonly exists: boolean
   readonly type: string
   children: FileNode[] | null
@@ -25,13 +26,15 @@ export class FileNode {
     name: string,
     type = 'file',
     id: number | null = null,
-    exists: boolean,
     path: string,
+    description: string,
+    exists: boolean,
   ) {
     this.id = id
     this.name = name
-    this.exists = exists
     this.path = path
+    this.description = description
+    this.exists = exists
 
     this.type = type // "folder" or "file"
     this.children = type === 'folder' ? [] : null
@@ -66,6 +69,20 @@ export function combineStuff(skips: Skip[], paths: string[]): SkipWithExists[] {
   return combined
 }
 
+function sortNodes(nodes: FileNode[]) {
+  nodes.sort((first, second) => {
+    if (first.type !== second.type) {
+      return first.type === 'folder' ? -1 : 1
+    }
+    return first.name.localeCompare(second.name)
+  })
+  for (const node of nodes) {
+    if (node.children) {
+      sortNodes(node.children)
+    }
+  }
+}
+
 export function buildFileTree(skips: SkipWithExists[]) {
   const tree: FileNode[] = []
 
@@ -79,8 +96,9 @@ export function buildFileTree(skips: SkipWithExists[]) {
           part,
           index === parts.length - 1 ? 'file' : 'folder',
           skip.id,
-          skip.exists,
           skip.path,
+          skip.description,
+          skip.exists,
         )
         current.push(node)
       }
@@ -88,6 +106,7 @@ export function buildFileTree(skips: SkipWithExists[]) {
     }
   }
 
+  sortNodes(tree)
   return tree
 }
 
