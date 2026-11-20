@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { buildFileTree, combineStuff, addSkip, removeSkip } from './utils'
 import type { FileNode } from './utils'
 import SkiplistTreeNode from './SkiplistTreeNode.vue'
@@ -49,6 +49,13 @@ async function updateSkips() {
   })
   emit('close')
 }
+
+onUnmounted(() => {
+  fileTree.value = []
+  addSkip.value = []
+  removeSkip.value = []
+  loading.value = true
+})
 </script>
 
 <template>

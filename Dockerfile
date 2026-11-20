@@ -1,5 +1,5 @@
 # Transcodarr backend builder
-FROM golang:1.26.3-trixie AS builder
+FROM golang:1.26.3-trixie AS go-builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
@@ -10,6 +10,8 @@ RUN CGO_ENABLED=1 go build -o ./server ./cmd/
 # frontend builder
 FROM node:24-trixie AS node-builder
 WORKDIR /app
+ARG VITE_GIT_TAG=unknown
+ENV VITE_GIT_TAG=${VITE_GIT_TAG}
 COPY ./frontend .
 RUN npm install
 RUN npm run build
